@@ -152,10 +152,17 @@ class EpubReader {
       } else if (e.key === 'Escape') {
         const sidebar = document.getElementById('sidebar');
         const btnToc = document.getElementById('btnToc');
-        sidebar.classList.remove('pinned');
-        btnToc.classList.remove('active');
-        // Also close settings modal if open
-        this.closeSettings();
+        const viewerContainer = document.getElementById('app');
+        
+        // Close sidebar if open
+        if (sidebar.classList.contains('open')) {
+          sidebar.classList.remove('open');
+          btnToc.classList.remove('active');
+          viewerContainer.classList.remove('sidebar-open');
+        } else {
+          // Also close settings modal if open
+          this.closeSettings();
+        }
       }
     });
     
@@ -375,13 +382,24 @@ class EpubReader {
       const styleElement = doc.createElement('style');
       styleElement.textContent = `
         img {
-          max-width: 85% !important;
+          max-width: 100% !important;
           height: auto !important;
           object-fit: contain !important;
         }
         image {
-          max-width: 85% !important;
+          max-width: 100% !important;
           height: auto !important;
+        }
+        /* Cover page specific styles */
+        .cover-page, [class*="cover"] {
+          text-align: center;
+        }
+        .cover-page img, [class*="cover"] img {
+          max-height: 90vh;
+          max-width: 100%;
+          object-fit: contain;
+          display: block;
+          margin: 0 auto;
         }
       `;
       if (doc.head) {
@@ -454,16 +472,14 @@ class EpubReader {
   toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const btnToc = document.getElementById('btnToc');
+    const viewerContainer = document.getElementById('app');
     
-    // Toggle pinned state
-    sidebar.classList.toggle('pinned');
+    // Toggle open state
+    sidebar.classList.toggle('open');
+    btnToc.classList.toggle('active');
     
-    // Update button active state
-    if (sidebar.classList.contains('pinned')) {
-      btnToc.classList.add('active');
-    } else {
-      btnToc.classList.remove('active');
-    }
+    // Toggle sidebar-open class on container to adjust layout
+    viewerContainer.classList.toggle('sidebar-open');
   }
 
   openSettings() {
