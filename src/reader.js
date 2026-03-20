@@ -11,7 +11,46 @@ class EpubReader {
     this.settings = {
       fontSize: 16,
       theme: 'light',
-      zoom: 1.0
+      zoom: 1.0,
+      tocFontSize: 14,
+      language: 'en'
+    };
+    
+    this.uiText = {
+      en: {
+        open: '📂 Open',
+        toc: '📑 TOC',
+        prev: '◀ Prev',
+        next: 'Next ▶',
+        zoomIn: '🔍+',
+        zoomOut: '🔍-',
+        theme: '🌙',
+        settings: '⚙️',
+        tocTitle: 'Table of Contents',
+        welcomeTitle: 'Welcome to Epub Reader for Edge',
+        welcomeText: 'Click "Open" to load an EPUB file, or drag and drop an EPUB file here.',
+        settingsTitle: 'Settings',
+        tocFontSizeLabel: 'TOC Font Size:',
+        languageLabel: 'Language:',
+        languageButton: '中文 / English'
+      },
+      zh: {
+        open: '📂 打开',
+        toc: '📑 目录',
+        prev: '◀ 上一页',
+        next: '下一页 ▶',
+        zoomIn: '🔍+',
+        zoomOut: '🔍-',
+        theme: '🌙',
+        settings: '⚙️',
+        tocTitle: '目录',
+        welcomeTitle: '欢迎使用 Edge EPUB 阅读器',
+        welcomeText: '点击"打开"加载 EPUB 文件，或将 EPUB 文件拖放到此处。',
+        settingsTitle: '设置',
+        tocFontSizeLabel: '目录字体大小:',
+        languageLabel: '语言:',
+        languageButton: '中文 / English'
+      }
     };
     
     this.init();
@@ -21,6 +60,7 @@ class EpubReader {
     this.bindEvents();
     this.loadSettings();
     this.applySettings();
+    this.updateUILanguage();
   }
 
   bindEvents() {
@@ -41,14 +81,6 @@ class EpubReader {
     
     // TOC
     document.getElementById('btnToc').addEventListener('click', () => this.toggleSidebar());
-    document.getElementById('btnCloseSidebar').addEventListener('click', () => {
-      const sidebar = document.getElementById('sidebar');
-      const contentArea = document.getElementById('contentArea');
-      const btnToc = document.getElementById('btnToc');
-      sidebar.classList.remove('pinned');
-      contentArea.classList.remove('sidebar-pinned');
-      btnToc.classList.remove('active');
-    });
 
     // Zoom
     document.getElementById('btnZoomIn').addEventListener('click', () => this.adjustZoom(0.1));
@@ -62,6 +94,26 @@ class EpubReader {
       this.settings.fontSize = parseInt(e.target.value);
       this.saveSettings();
       this.applyFontSize();
+    });
+
+    // Settings
+    document.getElementById('btnSettings').addEventListener('click', () => this.openSettings());
+    document.getElementById('btnCloseSettings').addEventListener('click', () => this.closeSettings());
+    
+    // TOC Font Size
+    document.getElementById('tocFontSizeSlider').addEventListener('input', (e) => {
+      const value = parseInt(e.target.value);
+      document.getElementById('tocFontSizeValue').textContent = value + 'px';
+      this.settings.tocFontSize = value;
+      this.saveSettings();
+      this.applyTocFontSize();
+    });
+    
+    // Language Toggle
+    document.getElementById('btnToggleLanguage').addEventListener('click', () => {
+      this.settings.language = this.settings.language === 'en' ? 'zh' : 'en';
+      this.saveSettings();
+      this.updateUILanguage();
     });
 
     // Drag and drop
@@ -99,11 +151,18 @@ class EpubReader {
         this.nextChapter();
       } else if (e.key === 'Escape') {
         const sidebar = document.getElementById('sidebar');
-        const contentArea = document.getElementById('contentArea');
         const btnToc = document.getElementById('btnToc');
         sidebar.classList.remove('pinned');
-        contentArea.classList.remove('sidebar-pinned');
         btnToc.classList.remove('active');
+        // Also close settings modal if open
+        this.closeSettings();
+      }
+    });
+    
+    // Close settings modal when clicking overlay
+    document.getElementById('settingsModal').addEventListener('click', (e) => {
+      if (e.target.id === 'settingsModal') {
+        this.closeSettings();
       }
     });
   }
@@ -227,28 +286,26 @@ class EpubReader {
 
   renderToc() {
     const tocContent = document.getElementById('tocContent');
-    const ul = document.createElement('ul');
+    
+    // Remove ul styling since we removed the CSS for it
+    tocContent.innerHTML = '';
     
     this.toc.forEach((item, index) => {
-      const li = document.createElement('li');
+      const div = document.createElement('div');
       const a = document.createElement('a');
       a.href = '#';
       a.textContent = item.label;
       a.addEventListener('click', (e) => {
         e.preventDefault();
         this.navigateToChapter(item.src);
-        // Only close sidebar if not pinned
-        const sidebar = document.getElementById('sidebar');
-        if (!sidebar.classList.contains('pinned')) {
-          this.toggleSidebar();
-        }
+        // Sidebar stays open when pinned, no need to toggle
       });
-      li.appendChild(a);
-      ul.appendChild(li);
+      div.appendChild(a);
+      tocContent.appendChild(div);
     });
     
-    tocContent.innerHTML = '';
-    tocContent.appendChild(ul);
+    // Apply current TOC font size
+    this.applyTocFontSize();
   }
 
   navigateToChapter(href) {
@@ -318,12 +375,12 @@ class EpubReader {
       const styleElement = doc.createElement('style');
       styleElement.textContent = `
         img {
-          max-width: 100% !important;
+          max-width: 85% !important;
           height: auto !important;
           object-fit: contain !important;
         }
         image {
-          max-width: 100% !important;
+          max-width: 85% !important;
           height: auto !important;
         }
       `;
@@ -396,12 +453,10 @@ class EpubReader {
 
   toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
-    const contentArea = document.getElementById('contentArea');
     const btnToc = document.getElementById('btnToc');
     
     // Toggle pinned state
     sidebar.classList.toggle('pinned');
-    contentArea.classList.toggle('sidebar-pinned');
     
     // Update button active state
     if (sidebar.classList.contains('pinned')) {
@@ -409,6 +464,59 @@ class EpubReader {
     } else {
       btnToc.classList.remove('active');
     }
+  }
+
+  openSettings() {
+    const modal = document.getElementById('settingsModal');
+    const tocFontSizeSlider = document.getElementById('tocFontSizeSlider');
+    
+    // Set current TOC font size value
+    tocFontSizeSlider.value = this.settings.tocFontSize;
+    document.getElementById('tocFontSizeValue').textContent = this.settings.tocFontSize + 'px';
+    
+    modal.classList.add('active');
+  }
+
+  closeSettings() {
+    const modal = document.getElementById('settingsModal');
+    modal.classList.remove('active');
+  }
+
+  applyTocFontSize() {
+    const tocContent = document.getElementById('tocContent');
+    tocContent.style.fontSize = this.settings.tocFontSize + 'px';
+  }
+
+  updateUILanguage() {
+    const lang = this.settings.language;
+    const text = this.uiText[lang];
+    
+    // Update toolbar buttons
+    document.getElementById('btnOpen').textContent = text.open;
+    document.getElementById('btnToc').textContent = text.toc;
+    document.getElementById('btnPrev').textContent = text.prev;
+    document.getElementById('btnNext').textContent = text.next;
+    document.getElementById('btnZoomIn').textContent = text.zoomIn;
+    document.getElementById('btnZoomOut').textContent = text.zoomOut;
+    document.getElementById('btnTheme').textContent = text.theme;
+    document.getElementById('btnSettings').textContent = text.settings;
+    
+    // Update sidebar title
+    document.getElementById('tocTitle').textContent = text.tocTitle;
+    
+    // Update welcome message
+    document.querySelector('#welcomeMessage h1').textContent = text.welcomeTitle;
+    document.querySelector('#welcomeMessage p').textContent = text.welcomeText;
+    
+    // Update settings modal
+    document.getElementById('settingsTitle').textContent = text.settingsTitle;
+    document.getElementById('tocFontSizeLabel').textContent = text.tocFontSizeLabel;
+    document.getElementById('languageLabel').textContent = text.languageLabel;
+    document.getElementById('btnToggleLanguage').textContent = text.languageButton;
+    
+    // Update drag overlay
+    const dragText = lang === 'en' ? 'Drop EPUB file here' : '将 EPUB 文件拖放到此处';
+    document.getElementById('dragOverlay').textContent = dragText;
   }
 
   adjustZoom(delta) {
@@ -475,6 +583,9 @@ class EpubReader {
     
     // Update theme button
     document.getElementById('btnTheme').textContent = this.settings.theme === 'light' ? '🌙' : '☀️';
+    
+    // Apply TOC font size
+    this.applyTocFontSize();
   }
 }
 

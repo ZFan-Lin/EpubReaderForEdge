@@ -19,13 +19,13 @@
       <button id="btnTheme" title="Toggle Theme">🌙</button>
       <input type="range" id="fontSizeSlider" min="12" max="32" value="16" title="Font Size">
       <span id="pageInfo"></span>
+      <button id="btnSettings" title="Settings">⚙️</button>
     </div>
 
     <!-- Sidebar for TOC -->
     <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <h3>Table of Contents</h3>
-        <button id="btnCloseSidebar">✕</button>
+        <h3 id="tocTitle">Table of Contents</h3>
       </div>
       <div class="toc-content" id="tocContent"></div>
     </div>
@@ -37,6 +37,27 @@
         <p>Click "Open" to load an EPUB file, or drag and drop an EPUB file here.</p>
       </div>
       <iframe id="viewerFrame" sandbox="allow-same-origin allow-scripts"></iframe>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 id="settingsTitle">Settings</h3>
+          <button id="btnCloseSettings">✕</button>
+        </div>
+        <div class="modal-content">
+          <div class="setting-item">
+            <label id="tocFontSizeLabel" for="tocFontSizeSlider">TOC Font Size:</label>
+            <input type="range" id="tocFontSizeSlider" min="12" max="24" value="14">
+            <span id="tocFontSizeValue">14px</span>
+          </div>
+          <div class="setting-item">
+            <label id="languageLabel">Language:</label>
+            <button id="btnToggleLanguage">中文 / English</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Drag and Drop Overlay -->
