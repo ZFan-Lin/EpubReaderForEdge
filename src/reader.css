@@ -189,6 +189,8 @@ body.dark-theme .button-17 #pageInfo {
   padding: 12px;
   font-size: 14px;
   pointer-events: auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 180px);
 }
 
 .toc-content a {
@@ -202,6 +204,37 @@ body.dark-theme .button-17 #pageInfo {
 
 .toc-content a:hover {
   background: #f0f0f0;
+}
+
+/* Custom scrollbar for TOC */
+.toc-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.toc-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.toc-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.toc-content::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+body.dark-theme .toc-content::-webkit-scrollbar-track {
+  background: #3a3a3a;
+}
+
+body.dark-theme .toc-content::-webkit-scrollbar-thumb {
+  background: #555;
+}
+
+body.dark-theme .toc-content::-webkit-scrollbar-thumb:hover {
+  background: #777;
 }
 
 /* Settings Modal Styles */
