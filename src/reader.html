@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Epub Reader</title>
+  <link rel="stylesheet" href="reader.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Toolbar -->
+    <div class="toolbar" id="toolbar">
+      <button id="btnOpen" title="Open EPUB">📂 Open</button>
+      <button id="btnToc" title="Table of Contents">📑 TOC</button>
+      <button id="btnPrev" title="Previous Page">◀ Prev</button>
+      <button id="btnNext" title="Next Page">Next ▶</button>
+      <button id="btnZoomIn" title="Zoom In">🔍+</button>
+      <button id="btnZoomOut" title="Zoom Out">🔍-</button>
+      <button id="btnTheme" title="Toggle Theme">🌙</button>
+      <input type="range" id="fontSizeSlider" min="12" max="32" value="16" title="Font Size">
+      <span id="pageInfo"></span>
+    </div>
+
+    <!-- Sidebar for TOC -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h3>Table of Contents</h3>
+        <button id="btnCloseSidebar">✕</button>
+      </div>
+      <div class="toc-content" id="tocContent"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="content-area" id="contentArea">
+      <div class="welcome-message" id="welcomeMessage">
+        <h1>Welcome to Epub Reader for Edge</h1>
+        <p>Click "Open" to load an EPUB file, or drag and drop an EPUB file here.</p>
+      </div>
+      <iframe id="viewerFrame" sandbox="allow-same-origin allow-scripts"></iframe>
+    </div>
+
+    <!-- Hidden file input -->
+    <input type="file" id="fileInput" accept=".epub" style="display: none;">
+  </div>
+
+  <!-- Libraries -->
+  <script src="../lib/jszip.min.js"></script>
+  <script src="reader.js"></script>
+</body>
+</html>
