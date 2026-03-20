@@ -172,6 +172,21 @@ class EpubReader {
         this.closeSettings();
       }
     });
+
+    // Prevent scroll-based page turning - only allow natural scrolling within content
+    const viewerFrame = document.getElementById('viewerFrame');
+    viewerFrame.addEventListener('load', () => {
+      try {
+        const frameDoc = viewerFrame.contentDocument || viewerFrame.contentWindow.document;
+        frameDoc.addEventListener('wheel', (e) => {
+          // Allow natural scrolling, do not trigger page turns
+          // This prevents accidental page turns when reaching end of content
+          e.stopPropagation();
+        }, { passive: true });
+      } catch (err) {
+        console.warn('Could not add wheel listener to frame:', err);
+      }
+    });
   }
 
   async loadEpub(file) {
