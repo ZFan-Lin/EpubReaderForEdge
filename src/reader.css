@@ -167,7 +167,6 @@ body.dark-theme .button-17 #pageInfo {
   display: flex;
   flex-direction: column;
   z-index: 1;
-  pointer-events: none;
 }
 
 .content-area > * {
@@ -381,7 +380,6 @@ body.dark-theme .toc-content::-webkit-scrollbar-thumb:hover {
   display: none;
   flex: 1;
   z-index: 2;
-  pointer-events: auto;
 }
 
 /* Cover page styles */
