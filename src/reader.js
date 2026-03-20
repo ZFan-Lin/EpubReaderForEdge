@@ -9,6 +9,8 @@ class EpubReader {
     this.chapters = [];
     this.toc = [];
     this.currentBookKey = null;
+    this.pendingLocation = null;
+    this.pendingChapterIndex = null;
     this.settings = {
       fontSize: 16,
       theme: 'light',
@@ -110,7 +112,10 @@ class EpubReader {
     // TOC Font Size slider in dropdown
     document.getElementById('tocFontSizeSliderDropdown').addEventListener('input', (e) => {
       const value = parseInt(e.target.value);
-      document.getElementById('tocFontSizeValueDropdown').textContent = value + 'px';
+      const tocFontSizeValueDropdown = document.getElementById('tocFontSizeValueDropdown');
+      if (tocFontSizeValueDropdown) {
+        tocFontSizeValueDropdown.textContent = value + 'px';
+      }
       this.settings.tocFontSize = value;
       this.saveSettings();
       this.applyTocFontSize();
@@ -119,8 +124,14 @@ class EpubReader {
     // Main Font Size slider in dropdown
     document.getElementById('mainFontSizeSliderDropdown').addEventListener('input', (e) => {
       const value = parseInt(e.target.value);
-      document.getElementById('mainFontSizeValueDropdown').textContent = value + 'px';
-      document.getElementById('fontSizeValueDisplay').textContent = value + 'px';
+      const mainFontSizeValueDropdown = document.getElementById('mainFontSizeValueDropdown');
+      if (mainFontSizeValueDropdown) {
+        mainFontSizeValueDropdown.textContent = value + 'px';
+      }
+      const fontSizeValueDisplay = document.getElementById('fontSizeValueDisplay');
+      if (fontSizeValueDisplay) {
+        fontSizeValueDisplay.textContent = value + 'px';
+      }
       this.settings.fontSize = value;
       this.saveSettings();
       this.applyFontSize();
@@ -221,11 +232,12 @@ class EpubReader {
       // Load first chapter or restore last position
       if (this.chapters.length > 0) {
         const lastLocation = this.getBookProgress(this.currentBookKey);
-        if (lastLocation && lastLocation.location) {
+        if (lastLocation && lastLocation.location !== undefined) {
           // We'll restore position after chapter loads
           this.pendingLocation = lastLocation.location;
-          console.log('Restoring reading position:', this.pendingLocation);
-          this.loadChapter(0);
+          this.pendingChapterIndex = lastLocation.chapterIndex || 0;
+          console.log('Restoring reading position:', this.pendingLocation, 'chapter:', this.pendingChapterIndex);
+          this.loadChapter(this.pendingChapterIndex);
         } else {
           this.loadChapter(0);
         }
@@ -458,37 +470,35 @@ class EpubReader {
         this.applyStylesToFrame(frame);
         
         // Restore last reading position if exists
-        if (this.pendingLocation) {
+        if (this.pendingLocation !== null && this.pendingLocation !== undefined) {
           try {
             console.log('Attempting to restore position:', this.pendingLocation);
-            // Try to navigate to the saved location using hash or simple chapter index
-            if (this.pendingLocation.startsWith('#')) {
+            const doc = frame.contentDocument;
+            const body = doc.body;
+            
+            // Try as percentage of chapter (most common case)
+            const percentage = parseFloat(this.pendingLocation);
+            if (!isNaN(percentage) && percentage >= 0 && percentage <= 1) {
+              const scrollHeight = body.scrollHeight - body.clientHeight;
+              if (scrollHeight > 0) {
+                const targetScroll = scrollHeight * percentage;
+                doc.documentElement.scrollTop = targetScroll;
+                body.scrollTop = targetScroll;
+                console.log('Restored position using percentage:', percentage, 'scroll:', targetScroll);
+              }
+            } else if (this.pendingLocation.startsWith('#')) {
+              // Try to navigate using element ID
               const targetId = this.pendingLocation.substring(1);
-              const targetElement = frame.contentDocument.getElementById(targetId);
+              const targetElement = doc.getElementById(targetId);
               if (targetElement) {
                 targetElement.scrollIntoView();
                 console.log('Restored position using element ID');
               }
             } else {
-              // Try to parse as chapter index or percentage
+              // Try to parse as chapter index
               const parsed = parseInt(this.pendingLocation);
               if (!isNaN(parsed) && parsed >= 0 && parsed < this.chapters.length) {
-                // It's a chapter index, already loaded
-                console.log('Chapter index position, already loaded');
-              } else {
-                // Try as percentage of chapter
-                const percentage = parseFloat(this.pendingLocation);
-                if (!isNaN(percentage) && percentage >= 0 && percentage <= 1) {
-                  const doc = frame.contentDocument;
-                  const body = doc.body;
-                  const scrollHeight = body.scrollHeight - body.clientHeight;
-                  if (scrollHeight > 0) {
-                    const targetScroll = scrollHeight * percentage;
-                    doc.documentElement.scrollTop = targetScroll;
-                    body.scrollTop = targetScroll;
-                    console.log('Restored position using percentage:', percentage);
-                  }
-                }
+                console.log('Chapter index position, already loaded chapter', parsed);
               }
             }
           } catch (e) {
@@ -577,11 +587,17 @@ class EpubReader {
     if (dropdown.classList.contains('active')) {
       // Set current TOC font size value
       tocFontSizeSlider.value = this.settings.tocFontSize;
-      document.getElementById('tocFontSizeValueDropdown').textContent = this.settings.tocFontSize + 'px';
+      const tocFontSizeValueDropdown = document.getElementById('tocFontSizeValueDropdown');
+      if (tocFontSizeValueDropdown) {
+        tocFontSizeValueDropdown.textContent = this.settings.tocFontSize + 'px';
+      }
       
       // Set current main font size value
       mainFontSizeSlider.value = this.settings.fontSize;
-      document.getElementById('mainFontSizeValueDropdown').textContent = this.settings.fontSize + 'px';
+      const mainFontSizeValueDropdown = document.getElementById('mainFontSizeValueDropdown');
+      if (mainFontSizeValueDropdown) {
+        mainFontSizeValueDropdown.textContent = this.settings.fontSize + 'px';
+      }
       
       // Apply current language to settings dropdown
       this.updateUILanguage();
@@ -658,8 +674,14 @@ class EpubReader {
   applyFontSize() {
     const frame = document.getElementById('viewerFrame');
     this.applyStylesToFrame(frame);
-    document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
-    document.getElementById('fontSizeValueDisplay').textContent = this.settings.fontSize + 'px';
+    const fontSizeValue = document.getElementById('fontSizeValue');
+    if (fontSizeValue) {
+      fontSizeValue.textContent = this.settings.fontSize + 'px';
+    }
+    const fontSizeValueDisplay = document.getElementById('fontSizeValueDisplay');
+    if (fontSizeValueDisplay) {
+      fontSizeValueDisplay.textContent = this.settings.fontSize + 'px';
+    }
   }
 
   updatePageInfo() {
@@ -696,16 +718,11 @@ class EpubReader {
       document.body.classList.remove('dark-theme');
     }
     
-    // Update font size slider and display
-    const fontSizeSlider = document.getElementById('fontSizeSlider');
-    if (fontSizeSlider) {
-      fontSizeSlider.value = this.settings.fontSize;
+    // Update font size display in toolbar
+    const fontSizeValueDisplay = document.getElementById('fontSizeValueDisplay');
+    if (fontSizeValueDisplay) {
+      fontSizeValueDisplay.textContent = this.settings.fontSize + 'px';
     }
-    const fontSizeValue = document.getElementById('fontSizeValue');
-    if (fontSizeValue) {
-      fontSizeValue.textContent = this.settings.fontSize + 'px';
-    }
-    document.getElementById('fontSizeValueDisplay').textContent = this.settings.fontSize + 'px';
     
     // Update main font size slider in settings dropdown
     const mainFontSizeSlider = document.getElementById('mainFontSizeSliderDropdown');
@@ -718,11 +735,17 @@ class EpubReader {
     const tocFontSizeSlider = document.getElementById('tocFontSizeSliderDropdown');
     if (tocFontSizeSlider) {
       tocFontSizeSlider.value = this.settings.tocFontSize;
-      document.getElementById('tocFontSizeValueDropdown').textContent = this.settings.tocFontSize + 'px';
+      const tocFontSizeValueDropdown = document.getElementById('tocFontSizeValueDropdown');
+      if (tocFontSizeValueDropdown) {
+        tocFontSizeValueDropdown.textContent = this.settings.tocFontSize + 'px';
+      }
     }
     
     // Update theme button
-    document.getElementById('btnTheme').textContent = this.settings.theme === 'light' ? '🌙' : '☀️';
+    const btnTheme = document.getElementById('btnTheme');
+    if (btnTheme) {
+      btnTheme.textContent = this.settings.theme === 'light' ? '🌙' : '☀️';
+    }
     
     // Apply TOC font size
     this.applyTocFontSize();
@@ -736,11 +759,12 @@ class EpubReader {
       const history = JSON.parse(localStorage.getItem(this.HISTORY_KEY) || '{}');
       history[key] = {
         location: location,
+        chapterIndex: this.currentChapterIndex,
         timestamp: Date.now(),
         bookName: key.replace('book_', '').replace(/_/g, ' ')
       };
       localStorage.setItem(this.HISTORY_KEY, JSON.stringify(history));
-      console.log('Saved progress for', key, ':', location);
+      console.log('Saved progress for', key, ':', location, 'chapter:', this.currentChapterIndex);
     } catch (e) {
       console.warn('Could not save book progress:', e);
     }
@@ -807,6 +831,11 @@ class EpubReader {
   // Get current reading location as percentage or element ID
   getCurrentLocation(doc) {
     try {
+      if (!doc || !doc.body) {
+        console.warn('Document or body not available for location detection');
+        return '0';
+      }
+      
       const body = doc.body;
       const scrollTop = doc.documentElement.scrollTop || body.scrollTop;
       const scrollHeight = body.scrollHeight - body.clientHeight;
