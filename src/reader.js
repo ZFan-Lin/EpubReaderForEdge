@@ -224,6 +224,7 @@ class EpubReader {
         if (lastLocation && lastLocation.location) {
           // We'll restore position after chapter loads
           this.pendingLocation = lastLocation.location;
+          console.log('Restoring reading position:', this.pendingLocation);
           this.loadChapter(0);
         } else {
           this.loadChapter(0);
@@ -459,28 +460,34 @@ class EpubReader {
         // Restore last reading position if exists
         if (this.pendingLocation) {
           try {
+            console.log('Attempting to restore position:', this.pendingLocation);
             // Try to navigate to the saved location using hash or simple chapter index
             if (this.pendingLocation.startsWith('#')) {
               const targetId = this.pendingLocation.substring(1);
               const targetElement = frame.contentDocument.getElementById(targetId);
               if (targetElement) {
                 targetElement.scrollIntoView();
+                console.log('Restored position using element ID');
               }
             } else {
               // Try to parse as chapter index or percentage
               const parsed = parseInt(this.pendingLocation);
               if (!isNaN(parsed) && parsed >= 0 && parsed < this.chapters.length) {
                 // It's a chapter index, already loaded
+                console.log('Chapter index position, already loaded');
               } else {
                 // Try as percentage of chapter
                 const percentage = parseFloat(this.pendingLocation);
                 if (!isNaN(percentage) && percentage >= 0 && percentage <= 1) {
                   const doc = frame.contentDocument;
                   const body = doc.body;
-                  const scrollHeight = body.scrollHeight;
-                  const targetScroll = scrollHeight * percentage;
-                  doc.documentElement.scrollTop = targetScroll;
-                  body.scrollTop = targetScroll;
+                  const scrollHeight = body.scrollHeight - body.clientHeight;
+                  if (scrollHeight > 0) {
+                    const targetScroll = scrollHeight * percentage;
+                    doc.documentElement.scrollTop = targetScroll;
+                    body.scrollTop = targetScroll;
+                    console.log('Restored position using percentage:', percentage);
+                  }
                 }
               }
             }
@@ -694,7 +701,10 @@ class EpubReader {
     if (fontSizeSlider) {
       fontSizeSlider.value = this.settings.fontSize;
     }
-    document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
+    const fontSizeValue = document.getElementById('fontSizeValue');
+    if (fontSizeValue) {
+      fontSizeValue.textContent = this.settings.fontSize + 'px';
+    }
     document.getElementById('fontSizeValueDisplay').textContent = this.settings.fontSize + 'px';
     
     // Update main font size slider in settings dropdown
@@ -730,6 +740,7 @@ class EpubReader {
         bookName: key.replace('book_', '').replace(/_/g, ' ')
       };
       localStorage.setItem(this.HISTORY_KEY, JSON.stringify(history));
+      console.log('Saved progress for', key, ':', location);
     } catch (e) {
       console.warn('Could not save book progress:', e);
     }
@@ -768,9 +779,17 @@ class EpubReader {
     };
     
     // Listen for scroll events in the iframe
-    doc.addEventListener('scroll', debouncedSave, true);
+    try {
+      doc.addEventListener('scroll', debouncedSave, true);
+    } catch (e) {
+      console.warn('Could not add scroll listener to document:', e);
+    }
     if (body) {
-      body.addEventListener('scroll', debouncedSave, true);
+      try {
+        body.addEventListener('scroll', debouncedSave, true);
+      } catch (e) {
+        console.warn('Could not add scroll listener to body:', e);
+      }
     }
     
     // Also save when leaving the page or closing tab
