@@ -150,6 +150,7 @@ body.dark-theme .button-17 #pageInfo {
   height: 100%;
   position: relative;
   z-index: 500;
+  pointer-events: auto;
 }
 
 .sidebar.open {
@@ -166,11 +167,17 @@ body.dark-theme .button-17 #pageInfo {
   display: flex;
   flex-direction: column;
   z-index: 1;
+  pointer-events: none;
+}
+
+.content-area > * {
+  pointer-events: auto;
 }
 
 .sidebar-header {
   padding: 12px;
   border-bottom: 1px solid #ddd;
+  pointer-events: auto;
 }
 
 .sidebar-header h3 {
@@ -181,6 +188,7 @@ body.dark-theme .button-17 #pageInfo {
 .toc-content {
   padding: 12px;
   font-size: 14px;
+  pointer-events: auto;
 }
 
 .toc-content a {
@@ -325,6 +333,7 @@ body.dark-theme .button-17 #pageInfo {
   height: 100%;
   text-align: center;
   color: #666;
+  pointer-events: auto;
 }
 
 #welcomeMessage h1 {
@@ -339,6 +348,7 @@ body.dark-theme .button-17 #pageInfo {
   display: none;
   flex: 1;
   z-index: 2;
+  pointer-events: auto;
 }
 
 /* Cover page styles */
