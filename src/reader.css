@@ -7,13 +7,14 @@
 body, html {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  overflow: hidden;
+  overflow: visible;
 }
 
 #app {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  overflow: visible;
 }
 
 /* Main container holds sidebar and content area */
@@ -21,7 +22,7 @@ body, html {
   display: flex;
   flex-direction: row;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
   min-width: 0;
 }
 
@@ -96,7 +97,7 @@ body, html {
 }
 
 .toolbar .button-17 {
-  margin: 2px;
+  margin: 2px 4px;
 }
 
 #fontSizeValueDisplay {
@@ -110,6 +111,10 @@ body.dark-theme .toolbar #fontSizeValueDisplay {
 }
 
 body.dark-theme #pageInfo {
+  color: #aaa;
+}
+
+body.dark-theme .button-17 #pageInfo {
   color: #aaa;
 }
 
@@ -147,7 +152,7 @@ body.dark-theme #pageInfo {
   flex: 1;
   position: relative;
   background: #fff;
-  overflow: hidden;
+  overflow: visible;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -193,10 +198,12 @@ body.dark-theme #pageInfo {
   justify-content: center;
   align-items: center;
   z-index: 2000;
+  pointer-events: auto;
 }
 
 .modal-overlay.active {
   display: flex;
+  pointer-events: auto;
 }
 
 .modal {
@@ -205,6 +212,8 @@ body.dark-theme #pageInfo {
   width: 400px;
   max-width: 90%;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 2001;
+  position: relative;
 }
 
 .modal-header {
@@ -318,6 +327,7 @@ body.dark-theme #pageInfo {
   border: none;
   display: none;
   flex: 1;
+  z-index: 100;
 }
 
 /* Cover page styles */

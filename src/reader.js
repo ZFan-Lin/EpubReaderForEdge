@@ -630,7 +630,7 @@ class EpubReader {
     if (this.chapters.length > 0) {
       pageInfo.textContent = `${this.currentChapterIndex + 1} / ${this.chapters.length}`;
     } else {
-      pageInfo.textContent = '';
+      pageInfo.textContent = 'N/N';
     }
   }
 
