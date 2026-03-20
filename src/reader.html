@@ -10,20 +10,16 @@
   <div id="app">
     <!-- Toolbar -->
     <div class="toolbar" id="toolbar">
-      <button id="btnOpen" title="Open EPUB">📂 Open</button>
-      <button id="btnToc" title="Table of Contents">📑 TOC</button>
-      <button id="btnPrev" title="Previous Page">◀ Prev</button>
-      <button id="btnNext" title="Next Page">Next ▶</button>
-      <button id="btnZoomIn" title="Zoom In">🔍+</button>
-      <button id="btnZoomOut" title="Zoom Out">🔍-</button>
-      <button id="btnTheme" title="Toggle Theme">🌙</button>
-      <div class="setting-item" style="display: flex; align-items: center; gap: 8px;">
-        <label for="fontSizeSlider" style="font-size: 12px; color: #666;">Font Size:</label>
-        <input type="range" id="fontSizeSlider" min="12" max="32" value="16" title="Font Size">
-        <span id="fontSizeValue">16px</span>
-      </div>
+      <button id="btnOpen" class="button-17" title="Open EPUB">📂 Open</button>
+      <button id="btnToc" class="button-17" title="Table of Contents">📑 TOC</button>
+      <button id="btnPrev" class="button-17" title="Previous Page">◀ Prev</button>
+      <button id="btnNext" class="button-17" title="Next Page">Next ▶</button>
+      <button id="btnZoomIn" class="button-17" title="Zoom In">🔍+</button>
+      <button id="btnZoomOut" class="button-17" title="Zoom Out">🔍-</button>
+      <button id="btnTheme" class="button-17" title="Toggle Theme">🌙</button>
+      <button id="btnFontSize" class="button-17" title="Font Size">🔤 <span id="fontSizeValueDisplay">16px</span></button>
       <span id="pageInfo"></span>
-      <button id="btnSettings" title="Settings" style="margin-left: auto;">⚙️</button>
+      <button id="btnSettings" class="button-17" title="Settings" style="margin-left: auto;">⚙️</button>
     </div>
 
     <!-- Main Container for Sidebar and Content -->
@@ -51,7 +47,7 @@
       <div class="modal">
         <div class="modal-header">
           <h3 id="settingsTitle">Settings</h3>
-          <button id="btnCloseSettings">✕</button>
+          <button id="btnCloseSettings" class="close-btn">✕</button>
         </div>
         <div class="modal-content">
           <div class="setting-item">
@@ -60,8 +56,29 @@
             <span id="tocFontSizeValue">14px</span>
           </div>
           <div class="setting-item">
+            <label id="fontSizeLabel" for="mainFontSizeSlider">Font Size:</label>
+            <input type="range" id="mainFontSizeSlider" min="12" max="32" value="16">
+            <span id="mainFontSizeValue">16px</span>
+          </div>
+          <div class="setting-item">
             <label id="languageLabel">Language:</label>
             <button id="btnToggleLanguage">中文 / English</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Font Size Modal -->
+    <div class="modal-overlay" id="fontSizeModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 id="fontSizeModalTitle">Font Size</h3>
+          <button id="btnCloseFontSize" class="close-btn">✕</button>
+        </div>
+        <div class="modal-content">
+          <div class="setting-item" style="justify-content: center;">
+            <input type="range" id="fontSizeSlider" min="12" max="32" value="16" style="width: 200px;">
+            <span id="fontSizeValue">16px</span>
           </div>
         </div>
       </div>

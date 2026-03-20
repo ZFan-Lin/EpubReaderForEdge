@@ -89,10 +89,17 @@ class EpubReader {
     // Theme
     document.getElementById('btnTheme').addEventListener('click', () => this.toggleTheme());
 
-    // Font size
+    // Font Size button - opens font size modal
+    document.getElementById('btnFontSize').addEventListener('click', () => this.openFontSizeModal());
+    
+    // Close font size modal
+    document.getElementById('btnCloseFontSize').addEventListener('click', () => this.closeFontSizeModal());
+    
+    // Font size slider in modal
     document.getElementById('fontSizeSlider').addEventListener('input', (e) => {
       this.settings.fontSize = parseInt(e.target.value);
       document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
+      document.getElementById('fontSizeValueDisplay').textContent = this.settings.fontSize + 'px';
       this.saveSettings();
       this.applyFontSize();
     });
@@ -100,6 +107,17 @@ class EpubReader {
     // Settings
     document.getElementById('btnSettings').addEventListener('click', () => this.openSettings());
     document.getElementById('btnCloseSettings').addEventListener('click', () => this.closeSettings());
+    
+    // Main font size slider in settings modal
+    document.getElementById('mainFontSizeSlider').addEventListener('input', (e) => {
+      const value = parseInt(e.target.value);
+      document.getElementById('mainFontSizeValue').textContent = value + 'px';
+      this.settings.fontSize = value;
+      document.getElementById('fontSizeValue').textContent = value + 'px';
+      document.getElementById('fontSizeValueDisplay').textContent = value + 'px';
+      this.saveSettings();
+      this.applyFontSize();
+    });
     
     // TOC Font Size
     document.getElementById('tocFontSizeSlider').addEventListener('input', (e) => {
@@ -174,6 +192,13 @@ class EpubReader {
     document.getElementById('settingsModal').addEventListener('click', (e) => {
       if (e.target.id === 'settingsModal') {
         this.closeSettings();
+      }
+    });
+    
+    // Close font size modal when clicking overlay
+    document.getElementById('fontSizeModal').addEventListener('click', (e) => {
+      if (e.target.id === 'fontSizeModal') {
+        this.closeFontSizeModal();
       }
     });
   }
@@ -485,10 +510,15 @@ class EpubReader {
   openSettings() {
     const modal = document.getElementById('settingsModal');
     const tocFontSizeSlider = document.getElementById('tocFontSizeSlider');
+    const mainFontSizeSlider = document.getElementById('mainFontSizeSlider');
     
     // Set current TOC font size value
     tocFontSizeSlider.value = this.settings.tocFontSize;
     document.getElementById('tocFontSizeValue').textContent = this.settings.tocFontSize + 'px';
+    
+    // Set current main font size value
+    mainFontSizeSlider.value = this.settings.fontSize;
+    document.getElementById('mainFontSizeValue').textContent = this.settings.fontSize + 'px';
     
     // Apply current language to settings modal
     this.updateUILanguage();
@@ -498,6 +528,27 @@ class EpubReader {
 
   closeSettings() {
     const modal = document.getElementById('settingsModal');
+    modal.classList.remove('active');
+  }
+  
+  openFontSizeModal() {
+    const modal = document.getElementById('fontSizeModal');
+    const fontSizeSlider = document.getElementById('fontSizeSlider');
+    
+    // Set current font size value
+    fontSizeSlider.value = this.settings.fontSize;
+    document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
+    
+    // Apply current language to font size modal
+    const lang = this.settings.language;
+    const text = this.uiText[lang];
+    document.getElementById('fontSizeModalTitle').textContent = lang === 'en' ? 'Font Size' : '字体大小';
+    
+    modal.classList.add('active');
+  }
+  
+  closeFontSizeModal() {
+    const modal = document.getElementById('fontSizeModal');
     modal.classList.remove('active');
   }
 
@@ -520,6 +571,9 @@ class EpubReader {
     document.getElementById('btnTheme').textContent = text.theme;
     document.getElementById('btnSettings').textContent = text.settings;
     
+    // Update font size button display
+    document.getElementById('btnFontSize').innerHTML = '🔤 <span id="fontSizeValueDisplay">' + this.settings.fontSize + 'px</span>';
+    
     // Update sidebar title
     document.getElementById('tocTitle').textContent = text.tocTitle;
     
@@ -530,8 +584,12 @@ class EpubReader {
     // Update settings modal
     document.getElementById('settingsTitle').textContent = text.settingsTitle;
     document.getElementById('tocFontSizeLabel').textContent = text.tocFontSizeLabel;
+    document.getElementById('fontSizeLabel').textContent = lang === 'en' ? 'Font Size:' : '字体大小:';
     document.getElementById('languageLabel').textContent = text.languageLabel;
     document.getElementById('btnToggleLanguage').textContent = text.languageButton;
+    
+    // Update font size modal
+    document.getElementById('fontSizeModalTitle').textContent = lang === 'en' ? 'Font Size' : '字体大小';
     
     // Update drag overlay
     const dragText = lang === 'en' ? 'Drop EPUB file here' : '将 EPUB 文件拖放到此处';
@@ -564,6 +622,7 @@ class EpubReader {
     const frame = document.getElementById('viewerFrame');
     this.applyStylesToFrame(frame);
     document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
+    document.getElementById('fontSizeValueDisplay').textContent = this.settings.fontSize + 'px';
   }
 
   updatePageInfo() {
@@ -601,6 +660,14 @@ class EpubReader {
     // Update font size slider and display
     document.getElementById('fontSizeSlider').value = this.settings.fontSize;
     document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
+    document.getElementById('fontSizeValueDisplay').textContent = this.settings.fontSize + 'px';
+    
+    // Update main font size slider in settings modal
+    const mainFontSizeSlider = document.getElementById('mainFontSizeSlider');
+    if (mainFontSizeSlider) {
+      mainFontSizeSlider.value = this.settings.fontSize;
+      document.getElementById('mainFontSizeValue').textContent = this.settings.fontSize + 'px';
+    }
     
     // Update TOC font size slider
     const tocFontSizeSlider = document.getElementById('tocFontSizeSlider');
