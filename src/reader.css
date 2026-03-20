@@ -45,6 +45,15 @@ body, html {
   background: #d0d0d0;
 }
 
+.toolbar button.active {
+  background: #a0a0a0;
+  color: #fff;
+}
+
+.toolbar button.active:hover {
+  background: #909090;
+}
+
 .toolbar input[type="range"] {
   width: 100px;
 }
@@ -72,6 +81,16 @@ body, html {
 
 .sidebar.open {
   left: 0;
+}
+
+.sidebar.pinned {
+  left: 0;
+}
+
+/* Adjust content area when sidebar is pinned */
+.content-area.sidebar-pinned {
+  margin-left: 300px;
+  width: calc(100% - 300px);
 }
 
 .sidebar-header {

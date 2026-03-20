@@ -41,7 +41,14 @@ class EpubReader {
     
     // TOC
     document.getElementById('btnToc').addEventListener('click', () => this.toggleSidebar());
-    document.getElementById('btnCloseSidebar').addEventListener('click', () => this.toggleSidebar());
+    document.getElementById('btnCloseSidebar').addEventListener('click', () => {
+      const sidebar = document.getElementById('sidebar');
+      const contentArea = document.getElementById('contentArea');
+      const btnToc = document.getElementById('btnToc');
+      sidebar.classList.remove('pinned');
+      contentArea.classList.remove('sidebar-pinned');
+      btnToc.classList.remove('active');
+    });
 
     // Zoom
     document.getElementById('btnZoomIn').addEventListener('click', () => this.adjustZoom(0.1));
@@ -59,19 +66,21 @@ class EpubReader {
 
     // Drag and drop
     const contentArea = document.getElementById('contentArea');
+    const dragOverlay = document.getElementById('dragOverlay');
+    
     contentArea.addEventListener('dragover', (e) => {
       e.preventDefault();
-      document.querySelector('.drag-overlay')?.classList.add('active');
+      if (dragOverlay) dragOverlay.classList.add('active');
     });
 
     contentArea.addEventListener('dragleave', (e) => {
       e.preventDefault();
-      document.querySelector('.drag-overlay')?.classList.remove('active');
+      if (dragOverlay) dragOverlay.classList.remove('active');
     });
 
     contentArea.addEventListener('drop', (e) => {
       e.preventDefault();
-      document.querySelector('.drag-overlay')?.classList.remove('active');
+      if (dragOverlay) dragOverlay.classList.remove('active');
       if (e.dataTransfer.files.length > 0) {
         const file = e.dataTransfer.files[0];
         if (file.name.endsWith('.epub')) {
@@ -89,7 +98,12 @@ class EpubReader {
       } else if (e.key === 'ArrowRight') {
         this.nextChapter();
       } else if (e.key === 'Escape') {
-        document.getElementById('sidebar').classList.remove('open');
+        const sidebar = document.getElementById('sidebar');
+        const contentArea = document.getElementById('contentArea');
+        const btnToc = document.getElementById('btnToc');
+        sidebar.classList.remove('pinned');
+        contentArea.classList.remove('sidebar-pinned');
+        btnToc.classList.remove('active');
       }
     });
   }
@@ -223,7 +237,11 @@ class EpubReader {
       a.addEventListener('click', (e) => {
         e.preventDefault();
         this.navigateToChapter(item.src);
-        this.toggleSidebar();
+        // Only close sidebar if not pinned
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar.classList.contains('pinned')) {
+          this.toggleSidebar();
+        }
       });
       li.appendChild(a);
       ul.appendChild(li);
@@ -249,8 +267,80 @@ class EpubReader {
     try {
       const content = await this.zip.file(chapter.href).async('text');
       
+      // Get the base path for resolving relative image URLs
+      const chapterBasePath = chapter.href.substring(0, chapter.href.lastIndexOf('/') + 1);
+      
+      // Parse the XHTML content to resolve relative image paths
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(content, 'application/xhtml+xml');
+      
+      // Fix image src paths - need to extract images from zip and create blob URLs
+      const images = doc.querySelectorAll('img');
+      for (const img of images) {
+        let src = img.getAttribute('src');
+        if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://')) {
+          // Resolve relative path
+          const fullPath = chapterBasePath + src;
+          try {
+            // Extract image from zip and create blob URL
+            const imgFile = this.zip.file(fullPath);
+            if (imgFile) {
+              const imgBlob = await imgFile.async('blob');
+              const imgUrl = URL.createObjectURL(imgBlob);
+              img.setAttribute('src', imgUrl);
+            }
+          } catch (e) {
+            console.warn('Could not load image:', fullPath, e);
+          }
+        }
+      }
+      
+      // Also handle SVG images in manifest
+      const svgImages = doc.querySelectorAll('image');
+      for (const svgImg of svgImages) {
+        let href = svgImg.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || svgImg.getAttribute('href');
+        if (href && !href.startsWith('data:') && !href.startsWith('http://') && !href.startsWith('https://')) {
+          const fullPath = chapterBasePath + href;
+          try {
+            const imgFile = this.zip.file(fullPath);
+            if (imgFile) {
+              const imgBlob = await imgFile.async('blob');
+              const imgUrl = URL.createObjectURL(imgBlob);
+              svgImg.setAttributeNS('http://www.w3.org/1999/xlink', 'href', imgUrl);
+            }
+          } catch (e) {
+            console.warn('Could not load SVG image:', fullPath, e);
+          }
+        }
+      }
+      
+      // Add CSS styles to preserve image aspect ratio
+      const styleElement = doc.createElement('style');
+      styleElement.textContent = `
+        img {
+          max-width: 100% !important;
+          height: auto !important;
+          object-fit: contain !important;
+        }
+        image {
+          max-width: 100% !important;
+          height: auto !important;
+        }
+      `;
+      if (doc.head) {
+        doc.head.appendChild(styleElement);
+      } else {
+        const head = doc.createElement('head');
+        head.appendChild(styleElement);
+        doc.documentElement.insertBefore(head, doc.body);
+      }
+      
+      // Serialize back to string
+      const serializer = new XMLSerializer();
+      const modifiedContent = serializer.serializeToString(doc);
+      
       // Create a blob URL for the content
-      const blob = new Blob([content], { type: 'application/xhtml+xml' });
+      const blob = new Blob([modifiedContent], { type: 'application/xhtml+xml' });
       const url = URL.createObjectURL(blob);
       
       // Load into iframe
@@ -306,7 +396,19 @@ class EpubReader {
 
   toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
-    sidebar.classList.toggle('open');
+    const contentArea = document.getElementById('contentArea');
+    const btnToc = document.getElementById('btnToc');
+    
+    // Toggle pinned state
+    sidebar.classList.toggle('pinned');
+    contentArea.classList.toggle('sidebar-pinned');
+    
+    // Update button active state
+    if (sidebar.classList.contains('pinned')) {
+      btnToc.classList.add('active');
+    } else {
+      btnToc.classList.remove('active');
+    }
   }
 
   adjustZoom(delta) {
