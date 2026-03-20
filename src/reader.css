@@ -22,6 +22,7 @@ body, html {
   flex-direction: row;
   flex: 1;
   overflow: hidden;
+  min-width: 0;
 }
 
 /* Toolbar Styles */
@@ -33,6 +34,7 @@ body, html {
   background: #f5f5f5;
   border-bottom: 1px solid #ddd;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .toolbar button {
@@ -79,7 +81,6 @@ body, html {
   border-right: 1px solid #ddd;
   display: none;
   flex-direction: column;
-  flex-shrink: 0;
   overflow-y: auto;
   height: 100%;
 }

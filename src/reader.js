@@ -170,38 +170,6 @@ class EpubReader {
         this.closeSettings();
       }
     });
-
-    // Auto page turn on scroll to bottom of chapter
-    const viewerFrame = document.getElementById('viewerFrame');
-    let scrollTimeout = null;
-    
-    viewerFrame.addEventListener('load', () => {
-      try {
-        const frameDoc = viewerFrame.contentDocument || viewerFrame.contentWindow.document;
-        const frameWindow = viewerFrame.contentWindow;
-        
-        frameDoc.addEventListener('scroll', (e) => {
-          // Clear previous timeout
-          if (scrollTimeout) {
-            clearTimeout(scrollTimeout);
-          }
-          
-          // Check if scrolled to bottom (with debounce)
-          scrollTimeout = setTimeout(() => {
-            const scrollTop = frameDoc.documentElement.scrollTop || frameDoc.body.scrollTop;
-            const scrollHeight = frameDoc.documentElement.scrollHeight || frameDoc.body.scrollHeight;
-            const clientHeight = frameDoc.documentElement.clientHeight || frameDoc.body.clientHeight;
-            
-            // If scrolled to within 50px of bottom, trigger next chapter
-            if (scrollTop + clientHeight >= scrollHeight - 50) {
-              this.nextChapter();
-            }
-          }, 300);
-        }, { passive: true });
-      } catch (err) {
-        console.warn('Could not add scroll listener to frame:', err);
-      }
-    });
   }
 
   async loadEpub(file) {
