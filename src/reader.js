@@ -89,54 +89,47 @@ class EpubReader {
     // Theme
     document.getElementById('btnTheme').addEventListener('click', () => this.toggleTheme());
 
-    // Font Size button - opens font size modal
-    document.getElementById('btnFontSize').addEventListener('click', () => this.openFontSizeModal());
+    // Font Size button - opens font size modal (removed - using toolbar button now)
     
-    // Close font size modal
-    document.getElementById('btnCloseFontSize').addEventListener('click', () => this.closeFontSizeModal());
-    
-    // Font size slider in modal
-    document.getElementById('fontSizeSlider').addEventListener('input', (e) => {
-      this.settings.fontSize = parseInt(e.target.value);
-      document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
-      document.getElementById('fontSizeValueDisplay').textContent = this.settings.fontSize + 'px';
-      this.saveSettings();
-      this.applyFontSize();
-    });
-
-    // Settings
-    document.getElementById('btnSettings').addEventListener('click', () => this.openSettings());
-    document.getElementById('btnCloseSettings').addEventListener('click', () => this.closeSettings());
-    
-    // Main font size slider in settings modal
-    document.getElementById('mainFontSizeSlider').addEventListener('input', (e) => {
-      const value = parseInt(e.target.value);
-      document.getElementById('mainFontSizeValue').textContent = value + 'px';
-      this.settings.fontSize = value;
-      document.getElementById('fontSizeValue').textContent = value + 'px';
-      document.getElementById('fontSizeValueDisplay').textContent = value + 'px';
-      this.saveSettings();
-      this.applyFontSize();
+    // Settings - toggle dropdown panel
+    document.getElementById('btnSettings').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleSettingsDropdown();
     });
     
-    // TOC Font Size
-    document.getElementById('tocFontSizeSlider').addEventListener('input', (e) => {
+    // TOC Font Size slider in dropdown
+    document.getElementById('tocFontSizeSliderDropdown').addEventListener('input', (e) => {
       const value = parseInt(e.target.value);
-      document.getElementById('tocFontSizeValue').textContent = value + 'px';
+      document.getElementById('tocFontSizeValueDropdown').textContent = value + 'px';
       this.settings.tocFontSize = value;
       this.saveSettings();
       this.applyTocFontSize();
     });
     
-    // Language Toggle
-    document.getElementById('btnToggleLanguage').addEventListener('click', () => {
+    // Main Font Size slider in dropdown
+    document.getElementById('mainFontSizeSliderDropdown').addEventListener('input', (e) => {
+      const value = parseInt(e.target.value);
+      document.getElementById('mainFontSizeValueDropdown').textContent = value + 'px';
+      document.getElementById('fontSizeValueDisplay').textContent = value + 'px';
+      this.settings.fontSize = value;
+      this.saveSettings();
+      this.applyFontSize();
+    });
+    
+    // Language Toggle in dropdown
+    document.getElementById('btnToggleLanguageDropdown').addEventListener('click', () => {
       this.settings.language = this.settings.language === 'en' ? 'zh' : 'en';
       this.saveSettings();
       this.updateUILanguage();
-      // Re-apply language to settings modal if it's open
-      const settingsModal = document.getElementById('settingsModal');
-      if (settingsModal.classList.contains('active')) {
-        this.updateUILanguage();
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('settingsDropdown');
+      const btnSettings = document.getElementById('btnSettings');
+      if (dropdown && dropdown.classList.contains('active') && 
+          !dropdown.contains(e.target) && !btnSettings.contains(e.target)) {
+        this.closeSettingsDropdown();
       }
     });
 
@@ -182,23 +175,9 @@ class EpubReader {
           sidebar.classList.remove('open');
           btnToc.classList.remove('active');
         } else {
-          // Also close settings modal if open
-          this.closeSettings();
+          // Also close settings dropdown if open
+          this.closeSettingsDropdown();
         }
-      }
-    });
-    
-    // Close settings modal when clicking overlay
-    document.getElementById('settingsModal').addEventListener('click', (e) => {
-      if (e.target.id === 'settingsModal') {
-        this.closeSettings();
-      }
-    });
-    
-    // Close font size modal when clicking overlay
-    document.getElementById('fontSizeModal').addEventListener('click', (e) => {
-      if (e.target.id === 'fontSizeModal') {
-        this.closeFontSizeModal();
       }
     });
   }
@@ -508,49 +487,31 @@ class EpubReader {
     btnToc.classList.toggle('active');
   }
 
-  openSettings() {
-    const modal = document.getElementById('settingsModal');
-    const tocFontSizeSlider = document.getElementById('tocFontSizeSlider');
-    const mainFontSizeSlider = document.getElementById('mainFontSizeSlider');
+  toggleSettingsDropdown() {
+    const dropdown = document.getElementById('settingsDropdown');
+    const tocFontSizeSlider = document.getElementById('tocFontSizeSliderDropdown');
+    const mainFontSizeSlider = document.getElementById('mainFontSizeSliderDropdown');
     
-    // Set current TOC font size value
-    tocFontSizeSlider.value = this.settings.tocFontSize;
-    document.getElementById('tocFontSizeValue').textContent = this.settings.tocFontSize + 'px';
+    // Toggle visibility
+    dropdown.classList.toggle('active');
     
-    // Set current main font size value
-    mainFontSizeSlider.value = this.settings.fontSize;
-    document.getElementById('mainFontSizeValue').textContent = this.settings.fontSize + 'px';
-    
-    // Apply current language to settings modal
-    this.updateUILanguage();
-    
-    modal.classList.add('active');
-  }
-
-  closeSettings() {
-    const modal = document.getElementById('settingsModal');
-    modal.classList.remove('active');
+    if (dropdown.classList.contains('active')) {
+      // Set current TOC font size value
+      tocFontSizeSlider.value = this.settings.tocFontSize;
+      document.getElementById('tocFontSizeValueDropdown').textContent = this.settings.tocFontSize + 'px';
+      
+      // Set current main font size value
+      mainFontSizeSlider.value = this.settings.fontSize;
+      document.getElementById('mainFontSizeValueDropdown').textContent = this.settings.fontSize + 'px';
+      
+      // Apply current language to settings dropdown
+      this.updateUILanguage();
+    }
   }
   
-  openFontSizeModal() {
-    const modal = document.getElementById('fontSizeModal');
-    const fontSizeSlider = document.getElementById('fontSizeSlider');
-    
-    // Set current font size value
-    fontSizeSlider.value = this.settings.fontSize;
-    document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
-    
-    // Apply current language to font size modal
-    const lang = this.settings.language;
-    const text = this.uiText[lang];
-    document.getElementById('fontSizeModalTitle').textContent = lang === 'en' ? 'Font Size' : '字体大小';
-    
-    modal.classList.add('active');
-  }
-  
-  closeFontSizeModal() {
-    const modal = document.getElementById('fontSizeModal');
-    modal.classList.remove('active');
+  closeSettingsDropdown() {
+    const dropdown = document.getElementById('settingsDropdown');
+    dropdown.classList.remove('active');
   }
 
   applyTocFontSize() {
@@ -582,15 +543,11 @@ class EpubReader {
     document.querySelector('#welcomeMessage h1').textContent = text.welcomeTitle;
     document.querySelector('#welcomeMessage p').textContent = text.welcomeText;
     
-    // Update settings modal
-    document.getElementById('settingsTitle').textContent = text.settingsTitle;
+    // Update settings dropdown labels
     document.getElementById('tocFontSizeLabel').textContent = text.tocFontSizeLabel;
     document.getElementById('fontSizeLabel').textContent = lang === 'en' ? 'Font Size:' : '字体大小:';
     document.getElementById('languageLabel').textContent = text.languageLabel;
-    document.getElementById('btnToggleLanguage').textContent = text.languageButton;
-    
-    // Update font size modal
-    document.getElementById('fontSizeModalTitle').textContent = lang === 'en' ? 'Font Size' : '字体大小';
+    document.getElementById('btnToggleLanguageDropdown').textContent = text.languageButton;
     
     // Update drag overlay
     const dragText = lang === 'en' ? 'Drop EPUB file here' : '将 EPUB 文件拖放到此处';

@@ -19,7 +19,26 @@
       <button id="btnTheme" class="button-17" title="Toggle Theme">🌙</button>
       <button id="btnFontSize" class="button-17" title="Font Size">🔤 <span id="fontSizeValueDisplay">16px</span></button>
       <button id="btnPageInfo" class="button-17" style="cursor: default;" title="Page Info"><span id="pageInfo">N/N</span></button>
-      <button id="btnSettings" class="button-17" title="Settings" style="margin-left: auto;">⚙️</button>
+      <div class="dropdown-container" style="position: relative; display: inline-block;">
+        <button id="btnSettings" class="button-17" title="Settings" style="margin-left: auto;">⚙️</button>
+        <!-- Settings Dropdown Panel -->
+        <div class="settings-dropdown" id="settingsDropdown">
+          <div class="setting-item">
+            <label id="tocFontSizeLabel" for="tocFontSizeSliderDropdown">TOC Font Size:</label>
+            <input type="range" id="tocFontSizeSliderDropdown" min="12" max="24" value="14">
+            <span id="tocFontSizeValueDropdown">14px</span>
+          </div>
+          <div class="setting-item">
+            <label id="fontSizeLabel" for="mainFontSizeSliderDropdown">Font Size:</label>
+            <input type="range" id="mainFontSizeSliderDropdown" min="12" max="32" value="16">
+            <span id="mainFontSizeValueDropdown">16px</span>
+          </div>
+          <div class="setting-item">
+            <label id="languageLabel">Language:</label>
+            <button id="btnToggleLanguageDropdown">中文 / English</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Main Container for Sidebar and Content -->
@@ -47,48 +66,6 @@
     
     <!-- Drag and Drop Overlay -->
     <div class="drag-overlay" id="dragOverlay">Drop EPUB file here</div>
-    
-    <!-- Settings Modal - Moved outside #app to avoid z-index issues -->
-    <div class="modal-overlay" id="settingsModal">
-      <div class="modal">
-        <div class="modal-header">
-          <h3 id="settingsTitle">Settings</h3>
-          <button id="btnCloseSettings" class="close-btn">✕</button>
-        </div>
-        <div class="modal-content">
-          <div class="setting-item">
-            <label id="tocFontSizeLabel" for="tocFontSizeSlider">TOC Font Size:</label>
-            <input type="range" id="tocFontSizeSlider" min="12" max="24" value="14">
-            <span id="tocFontSizeValue">14px</span>
-          </div>
-          <div class="setting-item">
-            <label id="fontSizeLabel" for="mainFontSizeSlider">Font Size:</label>
-            <input type="range" id="mainFontSizeSlider" min="12" max="32" value="16">
-            <span id="mainFontSizeValue">16px</span>
-          </div>
-          <div class="setting-item">
-            <label id="languageLabel">Language:</label>
-            <button id="btnToggleLanguage">中文 / English</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Font Size Modal - Moved outside #app to avoid z-index issues -->
-    <div class="modal-overlay" id="fontSizeModal">
-      <div class="modal">
-        <div class="modal-header">
-          <h3 id="fontSizeModalTitle">Font Size</h3>
-          <button id="btnCloseFontSize" class="close-btn">✕</button>
-        </div>
-        <div class="modal-content">
-          <div class="setting-item" style="justify-content: center;">
-            <input type="range" id="fontSizeSlider" min="12" max="32" value="16" style="width: 200px;">
-            <span id="fontSizeValue">16px</span>
-          </div>
-        </div>
-      </div>
-    </div>
 
   <!-- Libraries -->
   <script src="../lib/jszip.min.js"></script>
