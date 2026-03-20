@@ -61,6 +61,13 @@ class EpubReader {
     this.loadSettings();
     this.applySettings();
     this.updateUILanguage();
+    
+    // Open TOC sidebar by default
+    const sidebar = document.getElementById('sidebar');
+    const btnToc = document.getElementById('btnToc');
+    // Sidebar is open by default (no 'closed' class)
+    btnToc.classList.add('active');
+    btnToc.textContent = '❌ Close';
   }
 
   bindEvents() {
@@ -170,10 +177,11 @@ class EpubReader {
         const sidebar = document.getElementById('sidebar');
         const btnToc = document.getElementById('btnToc');
         
-        // Close sidebar if open
-        if (sidebar.classList.contains('open')) {
-          sidebar.classList.remove('open');
+        // Close sidebar if open (not closed)
+        if (!sidebar.classList.contains('closed')) {
+          sidebar.classList.add('closed');
           btnToc.classList.remove('active');
+          btnToc.textContent = '📑 TOC';
         } else {
           // Also close settings dropdown if open
           this.closeSettingsDropdown();
@@ -482,9 +490,16 @@ class EpubReader {
     const sidebar = document.getElementById('sidebar');
     const btnToc = document.getElementById('btnToc');
     
-    // Toggle open state
-    sidebar.classList.toggle('open');
+    // Toggle closed state (default is open)
+    sidebar.classList.toggle('closed');
     btnToc.classList.toggle('active');
+    
+    // Update button icon based on state
+    if (sidebar.classList.contains('closed')) {
+      btnToc.textContent = '📑 TOC';
+    } else {
+      btnToc.textContent = '❌ Close';
+    }
   }
 
   toggleSettingsDropdown() {

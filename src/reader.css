@@ -144,7 +144,7 @@ body.dark-theme .button-17 #pageInfo {
   width: 280px;
   background: white;
   border-right: 1px solid #ddd;
-  display: none;
+  display: flex;
   flex-direction: column;
   overflow-y: auto;
   height: 100%;
@@ -153,8 +153,8 @@ body.dark-theme .button-17 #pageInfo {
   pointer-events: auto;
 }
 
-.sidebar.open {
-  display: flex;
+.sidebar.closed {
+  display: none;
 }
 
 /* Content Area */
