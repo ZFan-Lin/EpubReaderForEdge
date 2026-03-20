@@ -449,6 +449,7 @@ class EpubReader {
       
       // Load into iframe
       const frame = document.getElementById('viewerFrame');
+      frame.style.pointerEvents = 'auto';  // Re-enable pointer events for the iframe content
       frame.src = url;
       
       // Apply settings after load

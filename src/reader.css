@@ -162,7 +162,7 @@ body.dark-theme .button-17 #pageInfo {
   flex: 1;
   position: relative;
   background: #fff;
-  overflow: visible;
+  overflow: hidden;
   min-width: 0;
   display: flex;
   flex-direction: column;
