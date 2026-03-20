@@ -8,6 +8,7 @@ class EpubReader {
     this.currentChapterIndex = 0;
     this.chapters = [];
     this.toc = [];
+    this.currentBookKey = null;
     this.settings = {
       fontSize: 16,
       theme: 'light',
@@ -15,6 +16,8 @@ class EpubReader {
       tocFontSize: 14,
       language: 'en'
     };
+    
+    this.HISTORY_KEY = 'epub_reader_history';
     
     this.uiText = {
       en: {
@@ -205,6 +208,9 @@ class EpubReader {
       
       this.zip = await JSZip.loadAsync(arrayBuffer);
       
+      // Generate book key from filename
+      this.currentBookKey = 'book_' + file.name.replace(/[^a-zA-Z0-9]/g, '_');
+      
       // Parse EPUB structure
       await this.parseEpub();
       
@@ -212,9 +218,16 @@ class EpubReader {
       document.getElementById('welcomeMessage').style.display = 'none';
       document.getElementById('viewerFrame').style.display = 'block';
       
-      // Load first chapter
+      // Load first chapter or restore last position
       if (this.chapters.length > 0) {
-        this.loadChapter(0);
+        const lastLocation = this.getBookProgress(this.currentBookKey);
+        if (lastLocation && lastLocation.location) {
+          // We'll restore position after chapter loads
+          this.pendingLocation = lastLocation.location;
+          this.loadChapter(0);
+        } else {
+          this.loadChapter(0);
+        }
       }
       
       // Update page info
@@ -439,9 +452,46 @@ class EpubReader {
       frame.style.pointerEvents = 'auto';  // Re-enable pointer events for the iframe content
       frame.src = url;
       
-      // Apply settings after load
+      // Apply settings after load and restore position if needed
       frame.onload = () => {
         this.applyStylesToFrame(frame);
+        
+        // Restore last reading position if exists
+        if (this.pendingLocation) {
+          try {
+            // Try to navigate to the saved location using hash or simple chapter index
+            if (this.pendingLocation.startsWith('#')) {
+              const targetId = this.pendingLocation.substring(1);
+              const targetElement = frame.contentDocument.getElementById(targetId);
+              if (targetElement) {
+                targetElement.scrollIntoView();
+              }
+            } else {
+              // Try to parse as chapter index or percentage
+              const parsed = parseInt(this.pendingLocation);
+              if (!isNaN(parsed) && parsed >= 0 && parsed < this.chapters.length) {
+                // It's a chapter index, already loaded
+              } else {
+                // Try as percentage of chapter
+                const percentage = parseFloat(this.pendingLocation);
+                if (!isNaN(percentage) && percentage >= 0 && percentage <= 1) {
+                  const doc = frame.contentDocument;
+                  const body = doc.body;
+                  const scrollHeight = body.scrollHeight;
+                  const targetScroll = scrollHeight * percentage;
+                  doc.documentElement.scrollTop = targetScroll;
+                  body.scrollTop = targetScroll;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Could not restore reading position:', e);
+          }
+          this.pendingLocation = null;
+        }
+        
+        // Setup auto-save on scroll/resize in the iframe
+        this.setupAutoSave(frame);
       };
       
       this.updatePageInfo();
@@ -499,6 +549,13 @@ class EpubReader {
       btnToc.textContent = '📑 TOC';
     } else {
       btnToc.textContent = '❌ Close';
+    }
+    
+    // Save current position when toggling sidebar
+    const frame = document.getElementById('viewerFrame');
+    if (frame && frame.contentDocument && this.currentBookKey) {
+      const location = this.getCurrentLocation(frame.contentDocument);
+      this.saveBookProgress(this.currentBookKey, location);
     }
   }
 
@@ -631,22 +688,25 @@ class EpubReader {
     }
     
     // Update font size slider and display
-    document.getElementById('fontSizeSlider').value = this.settings.fontSize;
+    const fontSizeSlider = document.getElementById('fontSizeSlider');
+    if (fontSizeSlider) {
+      fontSizeSlider.value = this.settings.fontSize;
+    }
     document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
     document.getElementById('fontSizeValueDisplay').textContent = this.settings.fontSize + 'px';
     
-    // Update main font size slider in settings modal
-    const mainFontSizeSlider = document.getElementById('mainFontSizeSlider');
+    // Update main font size slider in settings dropdown
+    const mainFontSizeSlider = document.getElementById('mainFontSizeSliderDropdown');
     if (mainFontSizeSlider) {
       mainFontSizeSlider.value = this.settings.fontSize;
-      document.getElementById('mainFontSizeValue').textContent = this.settings.fontSize + 'px';
+      document.getElementById('mainFontSizeValueDropdown').textContent = this.settings.fontSize + 'px';
     }
     
-    // Update TOC font size slider
-    const tocFontSizeSlider = document.getElementById('tocFontSizeSlider');
+    // Update TOC font size slider in settings dropdown
+    const tocFontSizeSlider = document.getElementById('tocFontSizeSliderDropdown');
     if (tocFontSizeSlider) {
       tocFontSizeSlider.value = this.settings.tocFontSize;
-      document.getElementById('tocFontSizeValue').textContent = this.settings.tocFontSize + 'px';
+      document.getElementById('tocFontSizeValueDropdown').textContent = this.settings.tocFontSize + 'px';
     }
     
     // Update theme button
@@ -654,6 +714,90 @@ class EpubReader {
     
     // Apply TOC font size
     this.applyTocFontSize();
+  }
+
+  // Save book reading progress
+  saveBookProgress(key, location) {
+    if (!key) return;
+    
+    try {
+      const history = JSON.parse(localStorage.getItem(this.HISTORY_KEY) || '{}');
+      history[key] = {
+        location: location,
+        timestamp: Date.now(),
+        bookName: key.replace('book_', '').replace(/_/g, ' ')
+      };
+      localStorage.setItem(this.HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {
+      console.warn('Could not save book progress:', e);
+    }
+  }
+
+  // Get book reading progress
+  getBookProgress(key) {
+    if (!key) return null;
+    
+    try {
+      const history = JSON.parse(localStorage.getItem(this.HISTORY_KEY) || '{}');
+      return history[key] || null;
+    } catch (e) {
+      console.warn('Could not get book progress:', e);
+      return null;
+    }
+  }
+
+  // Setup auto-save of reading position
+  setupAutoSave(frame) {
+    if (!frame || !frame.contentDocument) return;
+    
+    const doc = frame.contentDocument;
+    const body = doc.body;
+    
+    // Debounce function to avoid saving too frequently
+    let saveTimeout = null;
+    const debouncedSave = () => {
+      if (saveTimeout) clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        if (this.currentBookKey) {
+          const location = this.getCurrentLocation(doc);
+          this.saveBookProgress(this.currentBookKey, location);
+        }
+      }, 500);
+    };
+    
+    // Listen for scroll events in the iframe
+    doc.addEventListener('scroll', debouncedSave, true);
+    if (body) {
+      body.addEventListener('scroll', debouncedSave, true);
+    }
+    
+    // Also save when leaving the page or closing tab
+    window.addEventListener('beforeunload', () => {
+      if (this.currentBookKey) {
+        const location = this.getCurrentLocation(doc);
+        this.saveBookProgress(this.currentBookKey, location);
+      }
+    });
+    
+    // Initial save
+    debouncedSave();
+  }
+
+  // Get current reading location as percentage or element ID
+  getCurrentLocation(doc) {
+    try {
+      const body = doc.body;
+      const scrollTop = doc.documentElement.scrollTop || body.scrollTop;
+      const scrollHeight = body.scrollHeight - body.clientHeight;
+      
+      if (scrollHeight <= 0) return '0';
+      
+      const percentage = (scrollTop / scrollHeight).toFixed(2);
+      return percentage;
+    } catch (e) {
+      console.warn('Could not get current location:', e);
+      return '0';
+    }
   }
 }
 
