@@ -2,6 +2,7 @@
 
 一个受 Calibre 阅读器启发的 Microsoft Edge EPUB 阅读插件。
 大量使用ai实现功能，但是我也熬了一个通宵。
+
 <img width="200" height="200" alt="200" src="https://github.com/user-attachments/assets/ecd56a40-7575-4f3f-b150-e887379e6a77" />
 ## 功能特性
 
