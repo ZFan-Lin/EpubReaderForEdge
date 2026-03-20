@@ -5,7 +5,10 @@
   "description": "A powerful EPUB reader extension for Microsoft Edge, inspired by Calibre's viewer",
   "permissions": [
     "storage",
-    "fileSystem"
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "src/popup.html",
