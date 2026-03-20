@@ -92,6 +92,7 @@ class EpubReader {
     // Font size
     document.getElementById('fontSizeSlider').addEventListener('input', (e) => {
       this.settings.fontSize = parseInt(e.target.value);
+      document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
       this.saveSettings();
       this.applyFontSize();
     });
@@ -114,6 +115,11 @@ class EpubReader {
       this.settings.language = this.settings.language === 'en' ? 'zh' : 'en';
       this.saveSettings();
       this.updateUILanguage();
+      // Re-apply language to settings modal if it's open
+      const settingsModal = document.getElementById('settingsModal');
+      if (settingsModal.classList.contains('active')) {
+        this.updateUILanguage();
+      }
     });
 
     // Drag and drop
@@ -484,6 +490,9 @@ class EpubReader {
     tocFontSizeSlider.value = this.settings.tocFontSize;
     document.getElementById('tocFontSizeValue').textContent = this.settings.tocFontSize + 'px';
     
+    // Apply current language to settings modal
+    this.updateUILanguage();
+    
     modal.classList.add('active');
   }
 
@@ -554,6 +563,7 @@ class EpubReader {
   applyFontSize() {
     const frame = document.getElementById('viewerFrame');
     this.applyStylesToFrame(frame);
+    document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
   }
 
   updatePageInfo() {
@@ -588,8 +598,16 @@ class EpubReader {
       document.body.classList.remove('dark-theme');
     }
     
-    // Update font size slider
+    // Update font size slider and display
     document.getElementById('fontSizeSlider').value = this.settings.fontSize;
+    document.getElementById('fontSizeValue').textContent = this.settings.fontSize + 'px';
+    
+    // Update TOC font size slider
+    const tocFontSizeSlider = document.getElementById('tocFontSizeSlider');
+    if (tocFontSizeSlider) {
+      tocFontSizeSlider.value = this.settings.tocFontSize;
+      document.getElementById('tocFontSizeValue').textContent = this.settings.tocFontSize + 'px';
+    }
     
     // Update theme button
     document.getElementById('btnTheme').textContent = this.settings.theme === 'light' ? '🌙' : '☀️';

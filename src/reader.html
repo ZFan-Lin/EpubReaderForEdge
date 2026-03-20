@@ -17,7 +17,11 @@
       <button id="btnZoomIn" title="Zoom In">🔍+</button>
       <button id="btnZoomOut" title="Zoom Out">🔍-</button>
       <button id="btnTheme" title="Toggle Theme">🌙</button>
-      <input type="range" id="fontSizeSlider" min="12" max="32" value="16" title="Font Size">
+      <div class="setting-item" style="display: flex; align-items: center; gap: 8px;">
+        <label for="fontSizeSlider" style="font-size: 12px; color: #666;">Font Size:</label>
+        <input type="range" id="fontSizeSlider" min="12" max="32" value="16" title="Font Size">
+        <span id="fontSizeValue">16px</span>
+      </div>
       <span id="pageInfo"></span>
       <button id="btnSettings" title="Settings" style="margin-left: auto;">⚙️</button>
     </div>
