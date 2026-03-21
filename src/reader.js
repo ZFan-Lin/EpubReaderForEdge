@@ -1121,6 +1121,16 @@ class CitronReader {
           return; // Stop processing after closing color picker
         }
         
+        // Close note popover if clicking outside of it
+        const notePopover = document.querySelector('.note-popover');
+        if (notePopover && notePopover.classList.contains('active')) {
+          // Check if click is outside the popover and outside any highlight with note
+          const highlightEl = e.target.closest('mark.citron-highlight');
+          if (!notePopover.contains(e.target) && (!highlightEl || !highlightEl.classList.contains('has-note'))) {
+            this.closeNotePopover();
+          }
+        }
+        
         // Close settings dropdown if open and click is not inside dropdown
         const dropdown = document.getElementById('settingsDropdown');
         if (dropdown && dropdown.classList.contains('active')) {
@@ -2074,11 +2084,14 @@ class CitronReader {
       doc.addEventListener('click', (e) => {
         const highlightEl = e.target.closest('mark.citron-highlight');
         if (highlightEl && highlightEl.dataset.highlightId) {
-          // Check if click is a simple click (not part of a selection)
-          const selection = doc.getSelection();
-          if (selection.isCollapsed) {
-            // Simple click, show note popover
-            this.showNotePopover(highlightEl.dataset.highlightId, highlightEl);
+          // Only show popover for highlights that have notes (marked with has-note class)
+          if (highlightEl.classList.contains('has-note')) {
+            // Check if click is a simple click (not part of a selection)
+            const selection = doc.getSelection();
+            if (selection.isCollapsed) {
+              // Simple click on a note, show note popover
+              this.showNotePopover(highlightEl.dataset.highlightId, highlightEl);
+            }
           }
         }
       }, { capture: true });
