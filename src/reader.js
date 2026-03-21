@@ -1160,20 +1160,52 @@ class CitronReader {
     try {
       // Check if range is valid
       if (!range || range.collapsed) {
+        console.warn('Invalid or collapsed range');
         return false;
       }
-      
-      // 【关键修复】跨段落高亮会导致 DOM 结构错乱
-      // 解决方案：不使用 extractContents，而是逐个文本节点进行高亮
-      // 这样可以确保每个段落的高亮独立，不会破坏 DOM 结构
       
       const doc = range.startContainer.ownerDocument;
       const startContainer = range.startContainer;
       const endContainer = range.endContainer;
-      const startOffset = range.startOffset;
-      const endOffset = range.endOffset;
       
-      // 使用 TreeWalker 收集范围内的所有文本节点
+      // Case 1: Single text node selection - simplest and most common case
+      if (startContainer === endContainer && startContainer.nodeType === Node.TEXT_NODE) {
+        const text = startContainer.textContent;
+        const startOffset = Math.max(0, Math.min(range.startOffset, text.length));
+        const endOffset = Math.max(startOffset, Math.min(range.endOffset, text.length));
+        
+        if (startOffset >= endOffset) {
+          console.warn('Invalid offsets for single node selection');
+          return false;
+        }
+        
+        const beforeText = text.substring(0, startOffset);
+        const selectedText = text.substring(startOffset, endOffset);
+        const afterText = text.substring(endOffset);
+        
+        const frag = document.createDocumentFragment();
+        
+        if (beforeText) {
+          frag.appendChild(document.createTextNode(beforeText));
+        }
+        
+        const mark = document.createElement('mark');
+        mark.classList.add('citron-highlight', color);
+        mark.dataset.highlightId = highlightId;
+        mark.dataset.color = color;
+        mark.textContent = selectedText;
+        frag.appendChild(mark);
+        
+        if (afterText) {
+          frag.appendChild(document.createTextNode(afterText));
+        }
+        
+        startContainer.parentNode.replaceChild(frag, startContainer);
+        return true;
+      }
+      
+      // Case 2: Multi-node or cross-paragraph selection
+      // Use TreeWalker to collect all text nodes in the range
       const root = range.commonAncestorContainer;
       const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
       
@@ -1181,51 +1213,34 @@ class CitronReader {
       let node = walker.nextNode();
       
       while (node) {
-        // 检查该文本节点是否与选区有交集
-        const nodeStart = 0;
-        const nodeEnd = node.length;
+        // Check if this text node intersects with the range
+        const nodeRange = doc.createRange();
+        nodeRange.selectNodeContents(node);
         
-        // 计算该节点在选区中的实际范围
-        let highlightStart = nodeStart;
-        let highlightEnd = nodeEnd;
+        // Skip if node is completely outside the selection range
+        const compareStart = range.compareBoundaryPoints(Range.END_TO_START, nodeRange);
+        const compareEnd = range.compareBoundaryPoints(Range.START_TO_END, nodeRange);
         
-        // 如果节点是起始容器，调整起始位置
-        if (node === startContainer) {
-          highlightStart = Math.min(startOffset, node.length);
-        }
-        
-        // 如果节点是结束容器，调整结束位置
-        if (node === endContainer) {
-          highlightEnd = Math.min(endOffset, node.length);
-        }
-        
-        // 检查节点是否在选区范围内
-        // 需要判断节点是否真正在 start 和 end 之间
-        const compareStart = range.comparePoint(node, 0);
-        const compareEnd = range.comparePoint(node, node.length);
-        
-        // 节点完全在选区之前或之后，跳过
-        if (compareEnd < 0 || compareStart > 0) {
+        if (compareStart >= 0 || compareEnd <= 0) {
           node = walker.nextNode();
           continue;
         }
         
-        // 节点与选区有交集
-        // 对于起始节点，可能需要截断前面部分
-        if (node === startContainer && startOffset > 0) {
-          highlightStart = Math.min(startOffset, node.length);
-        } else {
-          highlightStart = 0;
+        // Calculate the actual highlight range within this node
+        let highlightStart = 0;
+        let highlightEnd = node.length;
+        
+        // If this is the start container, adjust the start offset
+        if (node === startContainer && startContainer.nodeType === Node.TEXT_NODE) {
+          highlightStart = Math.max(0, Math.min(range.startOffset, node.length));
         }
         
-        // 对于结束节点，可能需要截断后面部分
-        if (node === endContainer && endOffset < node.length) {
-          highlightEnd = Math.min(endOffset, node.length);
-        } else {
-          highlightEnd = node.length;
+        // If this is the end container, adjust the end offset
+        if (node === endContainer && endContainer.nodeType === Node.TEXT_NODE) {
+          highlightEnd = Math.max(highlightStart, Math.min(range.endOffset, node.length));
         }
         
-        // 只有当有效范围大于 0 时才添加
+        // Only add if there's actual content to highlight
         if (highlightStart < highlightEnd) {
           textNodesToHighlight.push({
             node: node,
@@ -1237,32 +1252,56 @@ class CitronReader {
         node = walker.nextNode();
       }
       
-      // 对每个文本节点片段应用高亮
+      if (textNodesToHighlight.length === 0) {
+        console.warn('No text nodes found in range');
+        return false;
+      }
+      
+      // Apply highlight to each text node segment
+      // Process from end to start to avoid offset shifts
       let successCount = 0;
-      textNodesToHighlight.forEach(item => {
-        if (item.start >= item.end) return;
+      for (let i = textNodesToHighlight.length - 1; i >= 0; i--) {
+        const item = textNodesToHighlight[i];
+        
+        if (item.start >= item.end) continue;
         
         const txtNode = item.node;
-        const textRange = doc.createRange();
-        textRange.setStart(txtNode, item.start);
-        textRange.setEnd(txtNode, item.end);
+        const text = txtNode.textContent;
         
-        try {
-          const mark = document.createElement('mark');
-          mark.classList.add('citron-highlight', color);
-          mark.dataset.highlightId = highlightId;
-          mark.dataset.color = color;
-          textRange.surroundContents(mark);
-          successCount++;
-        } catch (e) {
-          console.warn("Failed to highlight text segment", e);
+        // Skip if offsets are invalid
+        if (item.start < 0 || item.end > text.length || item.start >= item.end) {
+          continue;
         }
-      });
+        
+        const beforeText = text.substring(0, item.start);
+        const selectedText = text.substring(item.start, item.end);
+        const afterText = text.substring(item.end);
+        
+        const frag = document.createDocumentFragment();
+        
+        if (beforeText) {
+          frag.appendChild(document.createTextNode(beforeText));
+        }
+        
+        const mark = document.createElement('mark');
+        mark.classList.add('citron-highlight', color);
+        mark.dataset.highlightId = highlightId;
+        mark.dataset.color = color;
+        mark.textContent = selectedText;
+        frag.appendChild(mark);
+        
+        if (afterText) {
+          frag.appendChild(document.createTextNode(afterText));
+        }
+        
+        txtNode.parentNode.replaceChild(frag, txtNode);
+        successCount++;
+      }
       
       return successCount > 0;
       
     } catch (e) {
-      console.warn('Could not apply highlight:', e);
+      console.error('Error applying highlight:', e);
       return false;
     }
   }
