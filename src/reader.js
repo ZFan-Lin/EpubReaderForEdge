@@ -608,11 +608,12 @@ class CitronReader {
             const docElement = doc.documentElement;
             
             // Normalize pendingLocation to new format { type, value }
-            let locationObj;
-            if (typeof this.pendingLocation === 'object' && this.pendingLocation.type) {
+            let locationObj = { type: 'percent', value: 0 }; // Default fallback
+            
+            if (typeof this.pendingLocation === 'object' && this.pendingLocation !== null && this.pendingLocation.type) {
               // New format
               locationObj = this.pendingLocation;
-            } else {
+            } else if (this.pendingLocation !== null && this.pendingLocation !== undefined) {
               // Old format (string or number) - treat as percentage
               const percentValue = parseFloat(this.pendingLocation);
               if (!isNaN(percentValue)) {
