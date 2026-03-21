@@ -573,9 +573,15 @@ class CitronReader {
               const currentAttempt = attemptCount || 1;
               
               // Get scroll metrics from both body and documentElement for compatibility
-              const scrollHeight = Math.max(body.scrollHeight, docElement.scrollHeight) - Math.max(body.clientHeight, docElement.clientHeight);
-              const currentScrollTop = Math.max(body.scrollTop, docElement.scrollTop);
+              const bodyScrollHeight = body.scrollHeight || 0;
+              const docElementScrollHeight = docElement.scrollHeight || 0;
+              const bodyClientHeight = body.clientHeight || 0;
+              const docElementClientHeight = docElement.clientHeight || 0;
               
+              const scrollHeight = Math.max(bodyScrollHeight, docElementScrollHeight) - Math.max(bodyClientHeight, docElementClientHeight);
+              const currentScrollTop = Math.max(body.scrollTop || 0, docElement.scrollTop || 0);
+              
+              console.log(`Restore attempt ${currentAttempt}: bodyScrollHeight=${bodyScrollHeight}, docElementScrollHeight=${docElementScrollHeight}, bodyClientHeight=${bodyClientHeight}, docElementClientHeight=${docElementClientHeight}`);
               console.log(`Restore attempt ${currentAttempt}: scrollHeight=${scrollHeight}, currentScrollTop=${currentScrollTop}`);
               
               if (scrollHeight <= 0) {
@@ -591,6 +597,8 @@ class CitronReader {
               
               // Try as percentage of chapter (most common case)
               const percentage = parseFloat(locationStr);
+              console.log('Parsed percentage:', percentage, 'is valid:', !isNaN(percentage) && percentage >= 0 && percentage <= 1);
+              
               if (!isNaN(percentage) && percentage >= 0 && percentage <= 1) {
                 const targetScroll = scrollHeight * percentage;
                 console.log('Restored position using percentage:', percentage, 'target scroll:', targetScroll, 'scrollHeight:', scrollHeight);
@@ -599,11 +607,24 @@ class CitronReader {
                 body.scrollTop = targetScroll;
                 docElement.scrollTop = targetScroll;
                 
+                // Also try scrolling the window object
+                if (doc.defaultView && doc.defaultView.scrollTo) {
+                  doc.defaultView.scrollTo(0, targetScroll);
+                }
+                
                 // Verify the scroll actually happened
                 setTimeout(() => {
-                  const newScrollTop = Math.max(body.scrollTop, docElement.scrollTop);
-                  console.log('Verification: actual scrollTop=', newScrollTop, 'expected=', targetScroll);
-                }, 100);
+                  const newBodyScrollTop = body.scrollTop || 0;
+                  const newDocElementScrollTop = docElement.scrollTop || 0;
+                  const newScrollTop = Math.max(newBodyScrollTop, newDocElementScrollTop);
+                  console.log('Verification: actual scrollTop=', newScrollTop, 'expected=', targetScroll, 'difference=', Math.abs(newScrollTop - targetScroll));
+                  
+                  if (Math.abs(newScrollTop - targetScroll) > 10) {
+                    console.warn('Scroll position verification failed! Retrying...');
+                    body.scrollTop = targetScroll;
+                    docElement.scrollTop = targetScroll;
+                  }
+                }, 200);
               } else if (locationStr.startsWith('#')) {
                 // Try to navigate using element ID
                 const targetId = locationStr.substring(1);
@@ -961,12 +982,23 @@ class CitronReader {
       }
       
       const body = doc.body;
-      const scrollTop = doc.documentElement.scrollTop || body.scrollTop;
-      const scrollHeight = body.scrollHeight - body.clientHeight;
+      const docElement = doc.documentElement;
       
-      if (scrollHeight <= 0) return '0';
+      // Get scrollTop from whichever element has it
+      const scrollTop = Math.max(docElement.scrollTop || 0, body.scrollTop || 0);
+      
+      // Get scrollHeight and clientHeight consistently
+      const scrollHeight = Math.max(docElement.scrollHeight, body.scrollHeight) - Math.max(docElement.clientHeight, body.clientHeight);
+      
+      console.log('getCurrentLocation:', { scrollTop, scrollHeight, percentage: scrollTop / scrollHeight });
+      
+      if (scrollHeight <= 0) {
+        console.warn('scrollHeight is 0 or negative, returning 0');
+        return '0';
+      }
       
       const percentage = (scrollTop / scrollHeight).toFixed(2);
+      console.log('Saved location percentage:', percentage);
       return percentage;
     } catch (e) {
       console.warn('Could not get current location:', e);
