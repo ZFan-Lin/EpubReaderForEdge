@@ -416,7 +416,81 @@ class CitronReader {
         }
       }
       
-      // Add CSS styles to preserve image aspect ratio
+      // Handle audio elements
+      const audioElements = doc.querySelectorAll('audio');
+      for (const audio of audioElements) {
+        let src = audio.getAttribute('src');
+        if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://')) {
+          const fullPath = chapterBasePath + src;
+          try {
+            const audioFile = this.zip.file(fullPath);
+            if (audioFile) {
+              const audioBlob = await audioFile.async('blob');
+              const audioUrl = URL.createObjectURL(audioBlob);
+              audio.setAttribute('src', audioUrl);
+            }
+          } catch (e) {
+            console.warn('Could not load audio:', fullPath, e);
+          }
+        }
+        // Also handle source elements inside audio
+        const sources = audio.querySelectorAll('source');
+        for (const source of sources) {
+          let src = source.getAttribute('src');
+          if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://')) {
+            const fullPath = chapterBasePath + src;
+            try {
+              const audioFile = this.zip.file(fullPath);
+              if (audioFile) {
+                const audioBlob = await audioFile.async('blob');
+                const audioUrl = URL.createObjectURL(audioBlob);
+                source.setAttribute('src', audioUrl);
+              }
+            } catch (e) {
+              console.warn('Could not load audio source:', fullPath, e);
+            }
+          }
+        }
+      }
+      
+      // Handle video elements
+      const videoElements = doc.querySelectorAll('video');
+      for (const video of videoElements) {
+        let src = video.getAttribute('src');
+        if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://')) {
+          const fullPath = chapterBasePath + src;
+          try {
+            const videoFile = this.zip.file(fullPath);
+            if (videoFile) {
+              const videoBlob = await videoFile.async('blob');
+              const videoUrl = URL.createObjectURL(videoBlob);
+              video.setAttribute('src', videoUrl);
+            }
+          } catch (e) {
+            console.warn('Could not load video:', fullPath, e);
+          }
+        }
+        // Also handle source elements inside video
+        const sources = video.querySelectorAll('source');
+        for (const source of sources) {
+          let src = source.getAttribute('src');
+          if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://')) {
+            const fullPath = chapterBasePath + src;
+            try {
+              const videoFile = this.zip.file(fullPath);
+              if (videoFile) {
+                const videoBlob = await videoFile.async('blob');
+                const videoUrl = URL.createObjectURL(videoBlob);
+                source.setAttribute('src', videoUrl);
+              }
+            } catch (e) {
+              console.warn('Could not load video source:', fullPath, e);
+            }
+          }
+        }
+      }
+      
+      // Add CSS styles to preserve image aspect ratio and media controls
       const styleElement = doc.createElement('style');
       styleElement.textContent = `
         img {
@@ -427,6 +501,15 @@ class CitronReader {
         image {
           max-width: 100% !important;
           height: auto !important;
+        }
+        /* Media elements (audio/video) styling */
+        audio, video {
+          max-width: 100% !important;
+          display: block;
+          margin: 1em auto;
+        }
+        video {
+          max-height: 80vh !important;
         }
         /* Cover page specific styles */
         .cover-page, [class*="cover"] {
