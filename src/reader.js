@@ -1163,41 +1163,106 @@ class CitronReader {
         return false;
       }
       
-      // Try simple approach first for single text node selections
+      // 【关键修复】跨段落高亮会导致 DOM 结构错乱
+      // 解决方案：不使用 extractContents，而是逐个文本节点进行高亮
+      // 这样可以确保每个段落的高亮独立，不会破坏 DOM 结构
+      
+      const doc = range.startContainer.ownerDocument;
       const startContainer = range.startContainer;
       const endContainer = range.endContainer;
+      const startOffset = range.startOffset;
+      const endOffset = range.endOffset;
       
-      // If selection is within a single text node, use surroundContents
-      if (startContainer === endContainer && startContainer.nodeType === Node.TEXT_NODE) {
-        const mark = document.createElement('mark');
-        mark.classList.add('citron-highlight', color);
-        mark.dataset.highlightId = highlightId;
-        mark.dataset.color = color;
-        range.surroundContents(mark);
-        return true;
+      // 使用 TreeWalker 收集范围内的所有文本节点
+      const root = range.commonAncestorContainer;
+      const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+      
+      const textNodesToHighlight = [];
+      let node = walker.nextNode();
+      
+      while (node) {
+        // 检查该文本节点是否与选区有交集
+        const nodeStart = 0;
+        const nodeEnd = node.length;
+        
+        // 计算该节点在选区中的实际范围
+        let highlightStart = nodeStart;
+        let highlightEnd = nodeEnd;
+        
+        // 如果节点是起始容器，调整起始位置
+        if (node === startContainer) {
+          highlightStart = Math.min(startOffset, node.length);
+        }
+        
+        // 如果节点是结束容器，调整结束位置
+        if (node === endContainer) {
+          highlightEnd = Math.min(endOffset, node.length);
+        }
+        
+        // 检查节点是否在选区范围内
+        // 需要判断节点是否真正在 start 和 end 之间
+        const compareStart = range.comparePoint(node, 0);
+        const compareEnd = range.comparePoint(node, node.length);
+        
+        // 节点完全在选区之前或之后，跳过
+        if (compareEnd < 0 || compareStart > 0) {
+          node = walker.nextNode();
+          continue;
+        }
+        
+        // 节点与选区有交集
+        // 对于起始节点，可能需要截断前面部分
+        if (node === startContainer && startOffset > 0) {
+          highlightStart = Math.min(startOffset, node.length);
+        } else {
+          highlightStart = 0;
+        }
+        
+        // 对于结束节点，可能需要截断后面部分
+        if (node === endContainer && endOffset < node.length) {
+          highlightEnd = Math.min(endOffset, node.length);
+        } else {
+          highlightEnd = node.length;
+        }
+        
+        // 只有当有效范围大于 0 时才添加
+        if (highlightStart < highlightEnd) {
+          textNodesToHighlight.push({
+            node: node,
+            start: highlightStart,
+            end: highlightEnd
+          });
+        }
+        
+        node = walker.nextNode();
       }
       
-      // For complex selections spanning multiple nodes, use extractContents/insertNode approach
-      const mark = document.createElement('mark');
-      mark.classList.add('citron-highlight', color);
-      mark.dataset.highlightId = highlightId;
-      mark.dataset.color = color;
+      // 对每个文本节点片段应用高亮
+      let successCount = 0;
+      textNodesToHighlight.forEach(item => {
+        if (item.start >= item.end) return;
+        
+        const txtNode = item.node;
+        const textRange = doc.createRange();
+        textRange.setStart(txtNode, item.start);
+        textRange.setEnd(txtNode, item.end);
+        
+        try {
+          const mark = document.createElement('mark');
+          mark.classList.add('citron-highlight', color);
+          mark.dataset.highlightId = highlightId;
+          mark.dataset.color = color;
+          textRange.surroundContents(mark);
+          successCount++;
+        } catch (e) {
+          console.warn("Failed to highlight text segment", e);
+        }
+      });
       
-      // Extract the contents and wrap them
-      const fragment = range.extractContents();
-      mark.appendChild(fragment);
-      range.insertNode(mark);
+      return successCount > 0;
       
-      // Clean up: normalize the parent to merge adjacent text nodes
-      const parent = mark.parentNode;
-      if (parent) {
-        parent.normalize();
-      }
-      
-      return true;
     } catch (e) {
-      console.warn('Could not apply highlight (complex selection):', e);
-      // Fallback: just save without visual for complex selections
+      console.warn('Could not apply highlight:', e);
       return false;
     }
   }
