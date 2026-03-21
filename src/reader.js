@@ -735,14 +735,50 @@ class CitronReader {
     try {
       const doc = frame.contentDocument || frame.contentWindow.document;
       
+      // Inject highlight styles into iframe
+      if (!doc.getElementById('citron-highlight-styles')) {
+        const styleElement = doc.createElement('style');
+        styleElement.id = 'citron-highlight-styles';
+        styleElement.textContent = `
+          mark.citron-highlight {
+            padding: 2px 0;
+            border-radius: 2px;
+            cursor: pointer;
+          }
+          mark.citron-highlight.yellow {
+            background-color: #ffeb3b !important;
+          }
+          mark.citron-highlight.blue {
+            background-color: #64b5f6 !important;
+          }
+          mark.citron-highlight.red {
+            background-color: #e57373 !important;
+          }
+          body.dark-theme mark.citron-highlight.yellow {
+            background-color: #f9a825 !important;
+          }
+          body.dark-theme mark.citron-highlight.blue {
+            background-color: #1976d2 !important;
+          }
+          body.dark-theme mark.citron-highlight.red {
+            background-color: #c62828 !important;
+          }
+        `;
+        if (doc.head) {
+          doc.head.appendChild(styleElement);
+        }
+      }
+      
       // Apply font size
       doc.body.style.fontSize = this.settings.fontSize + 'px';
       
       // Apply theme
       if (this.settings.theme === 'dark') {
+        doc.body.classList.add('dark-theme');
         doc.body.style.backgroundColor = '#1a1a1a';
         doc.body.style.color = '#ffffff';
       } else {
+        doc.body.classList.remove('dark-theme');
         doc.body.style.backgroundColor = '#ffffff';
         doc.body.style.color = '#000000';
       }
@@ -1055,7 +1091,7 @@ class CitronReader {
       // If selection is within a single text node, use surroundContents
       if (startContainer === endContainer && startContainer.nodeType === Node.TEXT_NODE) {
         const mark = document.createElement('mark');
-        mark.className = `citron-highlight ${color}`;
+        mark.classList.add('citron-highlight', color);
         mark.dataset.highlightId = highlightId;
         mark.dataset.color = color;
         range.surroundContents(mark);
@@ -1064,7 +1100,7 @@ class CitronReader {
       
       // For complex selections spanning multiple nodes, use extractContents/insertNode approach
       const mark = document.createElement('mark');
-      mark.className = `citron-highlight ${color}`;
+      mark.classList.add('citron-highlight', color);
       mark.dataset.highlightId = highlightId;
       mark.dataset.color = color;
       
