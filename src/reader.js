@@ -863,10 +863,7 @@ class CitronReader {
   applyFontSize() {
     const frame = document.getElementById('viewerFrame');
     this.applyStylesToFrame(frame);
-    const fontSizeValue = document.getElementById('fontSizeValue');
-    if (fontSizeValue) {
-      fontSizeValue.textContent = this.settings.fontSize + 'px';
-    }
+    // Note: fontSizeValue display element was removed from UI
   }
 
   updatePageInfo() {
