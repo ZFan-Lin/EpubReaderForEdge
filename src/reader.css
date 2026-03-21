@@ -464,6 +464,11 @@ body.dark-theme .settings-dropdown .setting-item button:hover {
   overflow: auto;
 }
 
+/* Ensure iframe content can receive click events for closing popups */
+#viewerFrame, #viewerFrame * {
+  pointer-events: auto;
+}
+
 
 /* Cover page styles */
 .cover-page img {

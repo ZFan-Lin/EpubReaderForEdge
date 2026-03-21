@@ -87,8 +87,6 @@ class CitronReader {
     
     document.getElementById('fileInput').addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
-        // Reset iframe pointer events when loading new file
-        document.getElementById('viewerFrame').style.pointerEvents = 'none';
         this.loadEpub(e.target.files[0]);
       }
     });
@@ -221,8 +219,6 @@ class CitronReader {
       if (e.dataTransfer.files.length > 0) {
         const file = e.dataTransfer.files[0];
         if (file.name.endsWith('.epub')) {
-          // Reset iframe pointer events when loading new file
-          document.getElementById('viewerFrame').style.pointerEvents = 'none';
           this.loadEpub(file);
         } else {
           alert('Please drop an EPUB file');
@@ -278,7 +274,7 @@ class CitronReader {
       document.getElementById('welcomeMessage').style.display = 'none';
       const frame = document.getElementById('viewerFrame');
       frame.style.display = 'block';
-      frame.style.pointerEvents = 'auto';
+      // pointerEvents is now handled by CSS
       
       // Load first chapter or restore last position
       if (this.chapters.length > 0) {
@@ -300,7 +296,6 @@ class CitronReader {
     } catch (error) {
       console.error('Error loading EPUB:', error);
       alert('Error loading EPUB: ' + error.message);
-      document.getElementById('viewerFrame').style.pointerEvents = 'none';
       document.getElementById('welcomeMessage').style.display = 'flex';
       document.getElementById('welcomeMessage').innerHTML = `
         <h1>Error Loading EPUB</h1>
@@ -646,12 +641,15 @@ class CitronReader {
       
       // Load into iframe
       const frame = document.getElementById('viewerFrame');
-      frame.style.pointerEvents = 'auto';  // Re-enable pointer events for the iframe content
+      // Keep pointerEvents as 'auto' - CSS now handles this, and we need clicks to work for closing popups
       frame.src = url;
       
       // Apply settings after load and restore position if needed
       frame.onload = () => {
         this.applyStylesToFrame(frame);
+        
+        // Add click listener to iframe content to close popups when clicking inside the book
+        this.addIframeClickListeners(frame);
         
         // Restore last reading position if exists
         if (this.pendingLocation !== null && this.pendingLocation !== undefined) {
@@ -1036,6 +1034,48 @@ class CitronReader {
     const colorPicker = document.getElementById('highlightColorPicker');
     if (colorPicker) {
       colorPicker.classList.remove('active');
+    }
+  }
+
+  // Add click listeners to iframe content to close popups when clicking inside the book
+  addIframeClickListeners(frame) {
+    try {
+      const doc = frame.contentDocument || frame.contentWindow.document;
+      if (!doc) return;
+      
+      // Remove any existing listener to avoid duplicates
+      if (this.iframeClickListener) {
+        doc.removeEventListener('click', this.iframeClickListener, { capture: true });
+      }
+      
+      this.iframeClickListener = (e) => {
+        // Close color picker if open
+        const colorPicker = document.getElementById('highlightColorPicker');
+        const btnHighlight = document.getElementById('btnHighlight');
+        if (colorPicker && colorPicker.classList.contains('active')) {
+          colorPicker.classList.remove('active');
+          // Clear selection in iframe
+          try {
+            const selection = doc.getSelection();
+            if (selection) {
+              selection.removeAllRanges();
+            }
+          } catch (err) {
+            // Ignore errors
+          }
+        }
+        
+        // Close settings dropdown if open
+        const dropdown = document.getElementById('settingsDropdown');
+        const btnSettings = document.getElementById('btnSettings');
+        if (dropdown && dropdown.classList.contains('active')) {
+          dropdown.classList.remove('active');
+        }
+      };
+      
+      doc.addEventListener('click', this.iframeClickListener, { capture: true });
+    } catch (e) {
+      console.warn('Could not add iframe click listener:', e);
     }
   }
 
