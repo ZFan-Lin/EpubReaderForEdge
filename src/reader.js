@@ -1043,12 +1043,41 @@ class CitronReader {
   // Add highlight mark element to DOM
   addHighlightToDOM(range, highlightId, color = 'yellow') {
     try {
+      // Check if range is valid
+      if (!range || range.collapsed) {
+        return;
+      }
+      
+      // Try simple approach first for single text node selections
+      const startContainer = range.startContainer;
+      const endContainer = range.endContainer;
+      
+      // If selection is within a single text node, use surroundContents
+      if (startContainer === endContainer && startContainer.nodeType === Node.TEXT_NODE) {
+        const mark = document.createElement('mark');
+        mark.className = `citron-highlight ${color}`;
+        mark.dataset.highlightId = highlightId;
+        mark.dataset.color = color;
+        range.surroundContents(mark);
+        return;
+      }
+      
+      // For complex selections spanning multiple nodes, use extractContents/insertNode approach
       const mark = document.createElement('mark');
       mark.className = `citron-highlight ${color}`;
       mark.dataset.highlightId = highlightId;
       mark.dataset.color = color;
       
-      range.surroundContents(mark);
+      // Extract the contents and wrap them
+      const fragment = range.extractContents();
+      mark.appendChild(fragment);
+      range.insertNode(mark);
+      
+      // Clean up: normalize the parent to merge adjacent text nodes
+      const parent = mark.parentNode;
+      if (parent) {
+        parent.normalize();
+      }
     } catch (e) {
       console.warn('Could not apply highlight (complex selection):', e);
       // Fallback: just save without visual for complex selections
