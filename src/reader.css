@@ -238,13 +238,16 @@ body.dark-theme .toc-content::-webkit-scrollbar-thumb:hover {
 
 /* Highlight styles */
 mark.citron-highlight {
-  background-color: #ffeb3b !important;
   padding: 2px 0;
   border-radius: 2px;
   cursor: pointer;
 }
 
-body.dark-theme mark.citron-highlight {
+mark.citron-highlight.yellow {
+  background-color: #ffeb3b !important;
+}
+
+body.dark-theme mark.citron-highlight.yellow {
   background-color: #f9a825 !important;
 }
 
@@ -253,20 +256,12 @@ mark.citron-highlight.blue {
   background-color: #64b5f6 !important;
 }
 
-mark.citron-highlight.yellow {
-  background-color: #ffeb3b !important;
-}
-
 mark.citron-highlight.red {
   background-color: #e57373 !important;
 }
 
 body.dark-theme mark.citron-highlight.blue {
   background-color: #1976d2 !important;
-}
-
-body.dark-theme mark.citron-highlight.yellow {
-  background-color: #f9a825 !important;
 }
 
 body.dark-theme mark.citron-highlight.red {
