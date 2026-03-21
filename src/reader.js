@@ -558,35 +558,61 @@ class CitronReader {
         // Restore last reading position if exists
         if (this.pendingLocation !== null && this.pendingLocation !== undefined) {
           try {
-            console.log('Attempting to restore position:', this.pendingLocation);
+            console.log('=== Starting Position Restoration ===');
+            console.log('Pending location value:', this.pendingLocation, 'type:', typeof this.pendingLocation);
+            
             const doc = frame.contentDocument;
             const body = doc.body;
+            const docElement = doc.documentElement;
             
             // Convert to string to safely check type
             const locationStr = String(this.pendingLocation);
             
             // Use requestAnimationFrame to ensure DOM is fully rendered
-            const restorePosition = () => {
+            const restorePosition = (attemptCount) => {
+              const currentAttempt = attemptCount || 1;
+              
+              // Get scroll metrics from both body and documentElement for compatibility
+              const scrollHeight = Math.max(body.scrollHeight, docElement.scrollHeight) - Math.max(body.clientHeight, docElement.clientHeight);
+              const currentScrollTop = Math.max(body.scrollTop, docElement.scrollTop);
+              
+              console.log(`Restore attempt ${currentAttempt}: scrollHeight=${scrollHeight}, currentScrollTop=${currentScrollTop}`);
+              
+              if (scrollHeight <= 0) {
+                // Content not fully rendered yet, try again
+                if (currentAttempt < 15) {
+                  console.log('Scroll height not ready, retrying in 80ms...');
+                  setTimeout(() => restorePosition(currentAttempt + 1), 80);
+                } else {
+                  console.warn('Failed to restore position: scrollHeight is 0 after', currentAttempt, 'attempts');
+                }
+                return;
+              }
+              
               // Try as percentage of chapter (most common case)
               const percentage = parseFloat(locationStr);
               if (!isNaN(percentage) && percentage >= 0 && percentage <= 1) {
-                const scrollHeight = body.scrollHeight - body.clientHeight;
-                if (scrollHeight > 0) {
-                  const targetScroll = scrollHeight * percentage;
-                  doc.documentElement.scrollTop = targetScroll;
-                  body.scrollTop = targetScroll;
-                  console.log('Restored position using percentage:', percentage, 'scroll:', targetScroll, 'scrollHeight:', scrollHeight);
-                } else {
-                  // Scroll height not ready yet, try again shortly
-                  setTimeout(restorePosition, 50);
-                }
+                const targetScroll = scrollHeight * percentage;
+                console.log('Restored position using percentage:', percentage, 'target scroll:', targetScroll, 'scrollHeight:', scrollHeight);
+                
+                // Set scroll position on both body and documentElement for compatibility
+                body.scrollTop = targetScroll;
+                docElement.scrollTop = targetScroll;
+                
+                // Verify the scroll actually happened
+                setTimeout(() => {
+                  const newScrollTop = Math.max(body.scrollTop, docElement.scrollTop);
+                  console.log('Verification: actual scrollTop=', newScrollTop, 'expected=', targetScroll);
+                }, 100);
               } else if (locationStr.startsWith('#')) {
                 // Try to navigate using element ID
                 const targetId = locationStr.substring(1);
                 const targetElement = doc.getElementById(targetId);
                 if (targetElement) {
                   targetElement.scrollIntoView();
-                  console.log('Restored position using element ID');
+                  console.log('Restored position using element ID:', targetId);
+                } else {
+                  console.warn('Element with ID', targetId, 'not found');
                 }
               } else {
                 // Try to parse as chapter index
@@ -598,7 +624,8 @@ class CitronReader {
             };
             
             // Start restoration after a short delay to ensure content is rendered
-            setTimeout(restorePosition, 100);
+            // Use multiple retries to handle slow-loading content
+            setTimeout(() => restorePosition(1), 100);
           } catch (e) {
             console.warn('Could not restore reading position:', e);
           }
