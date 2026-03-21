@@ -31,7 +31,7 @@ class CitronReader {
         next: 'Next ▶',
         zoomIn: '🔍+',
         zoomOut: '🔍-',
-        highlight: '🖍️ Highlight',
+        highlight: 'Highlight',
         theme: '🌙',
         settings: '⚙️',
         tocTitle: 'Table of Contents',
@@ -49,7 +49,7 @@ class CitronReader {
         next: '下一页 ▶',
         zoomIn: '🔍+',
         zoomOut: '🔍-',
-        highlight: '🖍️ 高亮',
+        highlight: '高亮',
         theme: '🌙',
         settings: '⚙️',
         tocTitle: '目录',
@@ -102,8 +102,29 @@ class CitronReader {
     document.getElementById('btnZoomIn').addEventListener('click', () => this.adjustZoom(0.1));
     document.getElementById('btnZoomOut').addEventListener('click', () => this.adjustZoom(-0.1));
 
-    // Highlight
-    document.getElementById('btnHighlight').addEventListener('click', () => this.toggleHighlightMode());
+    // Highlight - show color picker when text is selected
+    document.getElementById('btnHighlight').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showHighlightColorPicker();
+    });
+    
+    // Color picker click handlers
+    const colorPicker = document.getElementById('highlightColorPicker');
+    colorPicker.querySelectorAll('.color-option').forEach(option => {
+      option.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const color = option.dataset.color;
+        this.applyHighlightWithColor(color);
+      });
+    });
+    
+    // Close color picker when clicking outside
+    document.addEventListener('click', (e) => {
+      const colorPicker = document.getElementById('highlightColorPicker');
+      if (colorPicker && colorPicker.classList.contains('active')) {
+        colorPicker.classList.remove('active');
+      }
+    });
 
     // Theme
     document.getElementById('btnTheme').addEventListener('click', () => this.toggleTheme());
@@ -871,78 +892,54 @@ class CitronReader {
     this.applyStylesToFrame(frame);
   }
 
-  // Toggle highlight mode on/off
-  toggleHighlightMode() {
-    this.highlightMode = !this.highlightMode;
-    const btn = document.getElementById('btnHighlight');
-    
-    if (this.highlightMode) {
-      btn.style.background = '#fff3cd';
-      btn.style.border = '2px solid #ffc107';
-      btn.title = this.settings.language === 'en' ? 'Click and drag to select text to highlight' : '点击并拖动选择文本进行高亮';
-      
-      // Add selection listener to iframe
-      this.setupHighlightSelectionListener();
-    } else {
-      btn.style.background = '';
-      btn.style.border = '';
-      btn.title = this.settings.language === 'en' ? 'Highlight Text' : '高亮文本';
-      
-      // Remove selection listener
-      this.removeHighlightSelectionListener();
-    }
-  }
-
-  // Setup listener for text selection in iframe
-  setupHighlightSelectionListener() {
+  // Show highlight color picker when text is selected
+  showHighlightColorPicker() {
     const frame = document.getElementById('viewerFrame');
     if (!frame || !frame.contentDocument) return;
     
     const doc = frame.contentDocument;
+    const selection = doc.getSelection();
+    const selectedText = selection ? selection.toString().trim() : '';
     
-    // Store reference to remove later
-    this.highlightSelectionHandler = () => {
-      const selection = doc.getSelection();
-      if (selection && selection.toString().trim().length > 0) {
-        this.applyHighlight(selection);
-      }
-    };
-    
-    // Listen for mouseup (selection end)
-    doc.addEventListener('mouseup', this.highlightSelectionHandler);
-    this.highlightListenerElement = doc;
-  }
-
-  // Remove highlight selection listener
-  removeHighlightSelectionListener() {
-    if (this.highlightListenerElement && this.highlightSelectionHandler) {
-      this.highlightListenerElement.removeEventListener('mouseup', this.highlightSelectionHandler);
-      this.highlightListenerElement = null;
-      this.highlightSelectionHandler = null;
+    if (!selectedText || !this.currentBookKey) {
+      // No text selected, just show a hint or do nothing
+      return;
     }
+    
+    // Show color picker
+    const colorPicker = document.getElementById('highlightColorPicker');
+    colorPicker.classList.add('active');
   }
 
-  // Apply highlight to selected text
-  applyHighlight(selection) {
-    if (!this.highlightMode || !this.currentBookKey) return;
+  // Apply highlight with selected color
+  applyHighlightWithColor(color) {
+    const frame = document.getElementById('viewerFrame');
+    if (!frame || !frame.contentDocument) return;
+    
+    const doc = frame.contentDocument;
+    const selection = doc.getSelection();
+    
+    if (!selection || !selection.toString().trim()) {
+      // No valid selection
+      this.hideHighlightColorPicker();
+      return;
+    }
     
     const range = selection.getRangeAt(0);
     const selectedText = selection.toString().trim();
-    
-    if (!selectedText) return;
     
     // Get chapter info
     const chapterIndex = this.currentChapterIndex;
     const chapterHref = this.chapters[chapterIndex]?.href || '';
     
-    // Create highlight object
+    // Create highlight object with color
     const highlight = {
       id: 'hl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
       text: selectedText,
+      color: color,
       chapterIndex: chapterIndex,
       chapterHref: chapterHref,
       timestamp: Date.now(),
-      // Store context for better re-finding
       startOffset: range.startOffset,
       endOffset: range.endOffset,
       parentPath: this.getNodePath(range.startContainer)
@@ -952,15 +949,42 @@ class CitronReader {
     this.saveHighlight(highlight);
     
     // Apply visual highlight immediately
-    this.addHighlightToDOM(range, highlight.id);
+    this.addHighlightToDOM(range, highlight.id, color);
     
     // Clear selection
     selection.removeAllRanges();
     
-    // Turn off highlight mode after applying
-    this.toggleHighlightMode();
+    // Hide color picker
+    this.hideHighlightColorPicker();
     
     console.log('Highlight saved:', highlight);
+  }
+
+  hideHighlightColorPicker() {
+    const colorPicker = document.getElementById('highlightColorPicker');
+    if (colorPicker) {
+      colorPicker.classList.remove('active');
+    }
+  }
+
+  // Toggle highlight mode on/off (deprecated - kept for compatibility)
+  toggleHighlightMode() {
+    console.log('toggleHighlightMode is deprecated, use showHighlightColorPicker instead');
+  }
+
+  // Setup listener for text selection in iframe (deprecated)
+  setupHighlightSelectionListener() {
+    console.log('setupHighlightSelectionListener is deprecated');
+  }
+
+  // Remove highlight selection listener (deprecated)
+  removeHighlightSelectionListener() {
+    console.log('removeHighlightSelectionListener is deprecated');
+  }
+
+  // Apply highlight to selected text (deprecated)
+  applyHighlight(selection) {
+    console.log('applyHighlight is deprecated, use applyHighlightWithColor instead');
   }
 
   // Get path to node for reliable re-selection
@@ -1009,13 +1033,12 @@ class CitronReader {
   }
 
   // Add highlight mark element to DOM
-  addHighlightToDOM(range, highlightId) {
+  addHighlightToDOM(range, highlightId, color = 'yellow') {
     try {
       const mark = document.createElement('mark');
-      mark.className = 'citron-highlight';
+      mark.className = `citron-highlight ${color}`;
       mark.dataset.highlightId = highlightId;
-      mark.style.backgroundColor = '#ffeb3b';
-      mark.style.padding = '2px 0';
+      mark.dataset.color = color;
       
       range.surroundContents(mark);
     } catch (e) {
@@ -1099,7 +1122,7 @@ class CitronReader {
           const range = doc.createRange();
           range.setStart(textNode, highlight.startOffset - charCount);
           range.setEnd(textNode, highlight.startOffset - charCount + (highlight.endOffset - highlight.startOffset));
-          this.addHighlightToDOM(range, highlight.id);
+          this.addHighlightToDOM(range, highlight.id, highlight.color || 'yellow');
         }
       }
       
@@ -1142,7 +1165,7 @@ class CitronReader {
             const range = doc.createRange();
             range.setStart(startNode, startOffset);
             range.setEnd(endNode, endOffset);
-            this.addHighlightToDOM(range, highlight.id);
+            this.addHighlightToDOM(range, highlight.id, highlight.color || 'yellow');
           }
         }
       }
