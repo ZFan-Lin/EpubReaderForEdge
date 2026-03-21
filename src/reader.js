@@ -560,93 +560,62 @@ class CitronReader {
         if (this.pendingLocation !== null && this.pendingLocation !== undefined) {
           try {
             console.log('=== Starting Position Restoration ===');
-            console.log('Pending location value:', this.pendingLocation, 'type:', typeof this.pendingLocation);
+            console.log('Pending location:', this.pendingLocation);
             
             const doc = frame.contentDocument;
             const body = doc.body;
             const docElement = doc.documentElement;
             
-            // Convert to string to safely check type
-            const locationStr = String(this.pendingLocation);
-            
             // Use requestAnimationFrame to ensure DOM is fully rendered
             const restorePosition = (attemptCount) => {
               const currentAttempt = attemptCount || 1;
               
-              // Get scroll metrics from both body and documentElement for compatibility
+              // Get scroll metrics
+              const viewportHeight = frame.clientHeight || window.innerHeight;
               const bodyScrollHeight = body.scrollHeight || 0;
               const docElementScrollHeight = docElement.scrollHeight || 0;
-              const bodyClientHeight = body.clientHeight || 0;
-              const docElementClientHeight = docElement.clientHeight || 0;
+              const scrollHeight = Math.max(bodyScrollHeight, docElementScrollHeight) - viewportHeight;
               
-              const scrollHeight = Math.max(bodyScrollHeight, docElementScrollHeight) - Math.max(bodyClientHeight, docElementClientHeight);
-              const currentScrollTop = Math.max(body.scrollTop || 0, docElement.scrollTop || 0);
-              
-              console.log(`Restore attempt ${currentAttempt}: bodyScrollHeight=${bodyScrollHeight}, docElementScrollHeight=${docElementScrollHeight}, bodyClientHeight=${bodyClientHeight}, docElementClientHeight=${docElementClientHeight}`);
-              console.log(`Restore attempt ${currentAttempt}: scrollHeight=${scrollHeight}, currentScrollTop=${currentScrollTop}`);
+              console.log(`Restore attempt ${currentAttempt}: scrollHeight=${scrollHeight}, viewportHeight=${viewportHeight}`);
               
               if (scrollHeight <= 0) {
-                // Content not fully rendered yet, try again
                 if (currentAttempt < 15) {
-                  console.log('Scroll height not ready, retrying in 80ms...');
+                  console.log('Content not ready, retrying...');
                   setTimeout(() => restorePosition(currentAttempt + 1), 80);
                 } else {
-                  console.warn('Failed to restore position: scrollHeight is 0 after', currentAttempt, 'attempts');
+                  console.warn('Failed: scrollHeight still 0 after', currentAttempt, 'attempts');
                 }
                 return;
               }
               
-              // Try as percentage of chapter (most common case)
-              const percentage = parseFloat(locationStr);
-              console.log('Parsed percentage:', percentage, 'is valid:', !isNaN(percentage) && percentage >= 0 && percentage <= 1);
-              
-              if (!isNaN(percentage) && percentage >= 0 && percentage <= 1) {
+              // Check if we have an anchor ID or percentage
+              if (this.pendingLocation.type === 'id' && this.pendingLocation.value) {
+                const targetId = this.pendingLocation.value;
+                const targetElement = doc.getElementById(targetId);
+                if (targetElement) {
+                  targetElement.scrollIntoView();
+                  console.log('✓ Restored position using anchor ID:', targetId);
+                } else {
+                  console.warn('Anchor ID not found:', targetId);
+                }
+              } else if (this.pendingLocation.type === 'percent' && typeof this.pendingLocation.value === 'number') {
+                const percentage = this.pendingLocation.value;
                 const targetScroll = scrollHeight * percentage;
-                console.log('Restored position using percentage:', percentage, 'target scroll:', targetScroll, 'scrollHeight:', scrollHeight);
+                console.log('Restoring using percentage:', percentage, 'target:', targetScroll);
                 
-                // Set scroll position on both body and documentElement for compatibility
                 body.scrollTop = targetScroll;
                 docElement.scrollTop = targetScroll;
-                
-                // Also try scrolling the window object
                 if (doc.defaultView && doc.defaultView.scrollTo) {
                   doc.defaultView.scrollTo(0, targetScroll);
                 }
                 
-                // Verify the scroll actually happened
                 setTimeout(() => {
-                  const newBodyScrollTop = body.scrollTop || 0;
-                  const newDocElementScrollTop = docElement.scrollTop || 0;
-                  const newScrollTop = Math.max(newBodyScrollTop, newDocElementScrollTop);
-                  console.log('Verification: actual scrollTop=', newScrollTop, 'expected=', targetScroll, 'difference=', Math.abs(newScrollTop - targetScroll));
-                  
-                  if (Math.abs(newScrollTop - targetScroll) > 10) {
-                    console.warn('Scroll position verification failed! Retrying...');
-                    body.scrollTop = targetScroll;
-                    docElement.scrollTop = targetScroll;
-                  }
+                  const actualScroll = Math.max(body.scrollTop || 0, docElement.scrollTop || 0);
+                  console.log('Verification: expected=', targetScroll, 'actual=', actualScroll);
                 }, 200);
-              } else if (locationStr.startsWith('#')) {
-                // Try to navigate using element ID
-                const targetId = locationStr.substring(1);
-                const targetElement = doc.getElementById(targetId);
-                if (targetElement) {
-                  targetElement.scrollIntoView();
-                  console.log('Restored position using element ID:', targetId);
-                } else {
-                  console.warn('Element with ID', targetId, 'not found');
-                }
-              } else {
-                // Try to parse as chapter index
-                const parsed = parseInt(locationStr);
-                if (!isNaN(parsed) && parsed >= 0 && parsed < this.chapters.length) {
-                  console.log('Chapter index position, already loaded chapter', parsed);
-                }
               }
             };
             
-            // Start restoration after a short delay to ensure content is rendered
-            // Use multiple retries to handle slow-loading content
             setTimeout(() => restorePosition(1), 100);
           } catch (e) {
             console.warn('Could not restore reading position:', e);
@@ -983,49 +952,66 @@ class CitronReader {
     debouncedSave();
   }
 
-  // Get current reading location as percentage or element ID
+  // Get current reading location: Priority 1: Element ID, Priority 2: Percentage
   getCurrentLocation(frame) {
     try {
-      if (!frame) {
-        console.warn('getCurrentLocation: frame not available');
-        return '0';
+      if (!frame || !frame.contentDocument || !frame.contentDocument.body) {
+        console.warn('getCurrentLocation: Frame or document not ready');
+        return null;
       }
       
-      // For iframe-based content, we need to check the iframe's scroll position
       const doc = frame.contentDocument;
-      if (!doc || !doc.body) {
-        console.warn('getCurrentLocation: Document or body not available');
-        return '0';
-      }
-      
       const body = doc.body;
       const docElement = doc.documentElement;
       
-      // Get scrollTop from whichever element has it
-      const bodyScrollTop = body.scrollTop || 0;
-      const docElementScrollTop = docElement.scrollTop || 0;
-      const scrollTop = Math.max(bodyScrollTop, docElementScrollTop);
+      // Strategy 1: Find an anchor element (element with id) near the center of viewport
+      // This is much more reliable than percentage for EPUBs which have varying content
+      const viewportHeight = frame.clientHeight || window.innerHeight;
+      const scrollTop = body.scrollTop || docElement.scrollTop || 0;
+      const centerY = scrollTop + (viewportHeight / 3); // Look at upper third of visible area
       
-      // Get scrollHeight and clientHeight consistently
-      const bodyScrollHeight = body.scrollHeight || 0;
-      const docElementScrollHeight = docElement.scrollHeight || 0;
-      const bodyClientHeight = body.clientHeight || 0;
-      const docElementClientHeight = docElement.clientHeight || 0;
+      // Get all elements with ID in the body
+      const allElements = body.querySelectorAll('*[id]');
+      let bestAnchorId = null;
+      let minDistance = Infinity;
       
-      const scrollHeight = Math.max(bodyScrollHeight, docElementScrollHeight) - Math.max(bodyClientHeight, docElementClientHeight);
-      
-      if (scrollHeight <= 0) {
-        // If scrollHeight is 0, the content fits in the viewport, so we're at position 0
-        console.log('getCurrentLocation: scrollHeight is 0, content fits in viewport, returning 0');
-        return '0';
+      for (let el of allElements) {
+        const rect = el.getBoundingClientRect();
+        // Calculate element position relative to document
+        const elementTop = rect.top + scrollTop; 
+        
+        // We want an element that's visible or just above the viewport center
+        if (elementTop <= centerY + 50) {
+          const distance = Math.abs(elementTop - centerY);
+          if (distance < minDistance) {
+            minDistance = distance;
+            bestAnchorId = el.id;
+          }
+        }
       }
       
-      const percentage = (scrollTop / scrollHeight).toFixed(2);
-      console.log('getCurrentLocation: scrollTop=' + scrollTop + ', scrollHeight=' + scrollHeight + ', percentage=' + percentage);
-      return percentage;
+      if (bestAnchorId) {
+        console.log('getCurrentLocation: Found anchor ID:', bestAnchorId);
+        return { type: 'id', value: bestAnchorId };
+      }
+      
+      // Strategy 2: Fallback to percentage if no good anchor found
+      const bodyScrollHeight = body.scrollHeight || 0;
+      const docElementScrollHeight = docElement.scrollHeight || 0;
+      const scrollHeight = Math.max(bodyScrollHeight, docElementScrollHeight) - viewportHeight;
+      
+      if (scrollHeight <= 0) {
+        console.log('getCurrentLocation: scrollHeight is 0, returning 0');
+        return { type: 'percent', value: 0 };
+      }
+      
+      const percentage = scrollTop / scrollHeight;
+      console.log('getCurrentLocation: Using percentage:', percentage.toFixed(3));
+      return { type: 'percent', value: percentage };
+      
     } catch (e) {
       console.warn('getCurrentLocation error:', e);
-      return '0';
+      return { type: 'percent', value: 0 };
     }
   }
 }
