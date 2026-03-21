@@ -87,6 +87,8 @@ class CitronReader {
     
     document.getElementById('fileInput').addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
+        // Reset iframe pointer events when loading new file
+        document.getElementById('viewerFrame').style.pointerEvents = 'none';
         this.loadEpub(e.target.files[0]);
       }
     });
@@ -133,9 +135,13 @@ class CitronReader {
         // Clear selection in iframe to cancel highlight operation
         const frame = document.getElementById('viewerFrame');
         if (frame && frame.contentDocument) {
-          const selection = frame.contentDocument.getSelection();
-          if (selection) {
-            selection.removeAllRanges();
+          try {
+            const selection = frame.contentDocument.getSelection();
+            if (selection) {
+              selection.removeAllRanges();
+            }
+          } catch (err) {
+            // Ignore errors when clearing selection
           }
         }
       }
@@ -213,6 +219,8 @@ class CitronReader {
       if (e.dataTransfer.files.length > 0) {
         const file = e.dataTransfer.files[0];
         if (file.name.endsWith('.epub')) {
+          // Reset iframe pointer events when loading new file
+          document.getElementById('viewerFrame').style.pointerEvents = 'none';
           this.loadEpub(file);
         } else {
           alert('Please drop an EPUB file');
@@ -266,7 +274,9 @@ class CitronReader {
       
       // Hide welcome message, show viewer
       document.getElementById('welcomeMessage').style.display = 'none';
-      document.getElementById('viewerFrame').style.display = 'block';
+      const frame = document.getElementById('viewerFrame');
+      frame.style.display = 'block';
+      frame.style.pointerEvents = 'auto';
       
       // Load first chapter or restore last position
       if (this.chapters.length > 0) {
@@ -288,6 +298,7 @@ class CitronReader {
     } catch (error) {
       console.error('Error loading EPUB:', error);
       alert('Error loading EPUB: ' + error.message);
+      document.getElementById('viewerFrame').style.pointerEvents = 'none';
       document.getElementById('welcomeMessage').style.display = 'flex';
       document.getElementById('welcomeMessage').innerHTML = `
         <h1>Error Loading EPUB</h1>
@@ -906,9 +917,11 @@ class CitronReader {
     // Update sidebar title
     document.getElementById('tocTitle').textContent = text.tocTitle;
     
-    // Update welcome message
-    document.querySelector('#welcomeMessage h1').textContent = text.welcomeTitle;
-    document.querySelector('#welcomeMessage p').textContent = text.welcomeText;
+    // Update welcome message (only if element exists)
+    const welcomeH1 = document.querySelector('#welcomeMessage h1');
+    const welcomeP = document.querySelector('#welcomeMessage p');
+    if (welcomeH1) welcomeH1.textContent = text.welcomeTitle;
+    if (welcomeP) welcomeP.textContent = text.welcomeText;
     
     // Update settings dropdown labels
     document.getElementById('tocFontSizeLabel').textContent = text.tocFontSizeLabel;

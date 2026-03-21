@@ -530,8 +530,10 @@ body.dark-theme #welcomeMessage h1 {
   z-index: 2000;
   color: white;
   font-size: 24px;
+  pointer-events: none;
 }
 
 .drag-overlay.active {
   display: flex;
+  pointer-events: auto;
 }
