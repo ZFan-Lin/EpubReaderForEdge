@@ -102,13 +102,7 @@ class CitronReader {
     document.getElementById('btnZoomIn').addEventListener('click', () => this.adjustZoom(0.1));
     document.getElementById('btnZoomOut').addEventListener('click', () => this.adjustZoom(-0.1));
 
-    // Highlight - show color picker when text is selected
-    document.getElementById('btnHighlight').addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.showHighlightColorPicker();
-    });
-    
-    // Color picker click handlers
+    // Highlight color picker - click on color option to highlight selected text directly
     const colorPicker = document.getElementById('highlightColorPicker');
     colorPicker.querySelectorAll('.color-option').forEach(option => {
       option.addEventListener('click', (e) => {
@@ -118,10 +112,18 @@ class CitronReader {
       });
     });
     
-    // Close color picker when clicking outside
+    // Highlight button - toggle color picker visibility when text is selected
+    document.getElementById('btnHighlight').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleHighlightColorPicker();
+    });
+    
+    // Close color picker when clicking outside (but not when clicking on the color picker itself)
     document.addEventListener('click', (e) => {
       const colorPicker = document.getElementById('highlightColorPicker');
-      if (colorPicker && colorPicker.classList.contains('active')) {
+      const btnHighlight = document.getElementById('btnHighlight');
+      if (colorPicker && colorPicker.classList.contains('active') && 
+          !colorPicker.contains(e.target) && !btnHighlight.contains(e.target)) {
         colorPicker.classList.remove('active');
       }
     });
@@ -892,8 +894,8 @@ class CitronReader {
     this.applyStylesToFrame(frame);
   }
 
-  // Show highlight color picker when text is selected
-  showHighlightColorPicker() {
+  // Toggle highlight color picker visibility when text is selected
+  toggleHighlightColorPicker() {
     const frame = document.getElementById('viewerFrame');
     if (!frame || !frame.contentDocument) return;
     
@@ -906,9 +908,15 @@ class CitronReader {
       return;
     }
     
-    // Show color picker
+    // Toggle color picker visibility
     const colorPicker = document.getElementById('highlightColorPicker');
-    colorPicker.classList.add('active');
+    colorPicker.classList.toggle('active');
+  }
+
+  // Show highlight color picker when text is selected (deprecated - use toggleHighlightColorPicker instead)
+  showHighlightColorPicker() {
+    console.log('showHighlightColorPicker is deprecated, use toggleHighlightColorPicker instead');
+    this.toggleHighlightColorPicker();
   }
 
   // Apply highlight with selected color

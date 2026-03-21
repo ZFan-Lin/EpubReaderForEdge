@@ -304,13 +304,14 @@ body.dark-theme .highlight-color-picker {
   height: 32px;
   border-radius: 6px;
   cursor: pointer;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   border: 2px solid transparent;
 }
 
 .color-option:hover {
   transform: scale(1.1);
   border-color: #666;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .color-option[data-color="blue"] {
