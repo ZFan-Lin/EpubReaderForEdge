@@ -20,6 +20,8 @@ class CitronReader {
     };
     
     this.HISTORY_KEY = 'citron_reader_history';
+    this.HIGHLIGHTS_KEY = 'citron_reader_highlights';
+    this.highlightMode = false;
     
     this.uiText = {
       en: {
@@ -29,6 +31,7 @@ class CitronReader {
         next: 'Next ▶',
         zoomIn: '🔍+',
         zoomOut: '🔍-',
+        highlight: '🖍️ Highlight',
         theme: '🌙',
         settings: '⚙️',
         tocTitle: 'Table of Contents',
@@ -46,6 +49,7 @@ class CitronReader {
         next: '下一页 ▶',
         zoomIn: '🔍+',
         zoomOut: '🔍-',
+        highlight: '🖍️ 高亮',
         theme: '🌙',
         settings: '⚙️',
         tocTitle: '目录',
@@ -97,6 +101,9 @@ class CitronReader {
     // Zoom
     document.getElementById('btnZoomIn').addEventListener('click', () => this.adjustZoom(0.1));
     document.getElementById('btnZoomOut').addEventListener('click', () => this.adjustZoom(-0.1));
+
+    // Highlight
+    document.getElementById('btnHighlight').addEventListener('click', () => this.toggleHighlightMode());
 
     // Theme
     document.getElementById('btnTheme').addEventListener('click', () => this.toggleTheme());
@@ -689,6 +696,9 @@ class CitronReader {
         
         // Setup auto-save on scroll/resize in the iframe
         this.setupAutoSave(frame);
+        
+        // Load and apply highlights for current chapter
+        this.loadAndApplyHighlights();
       };
       
       this.updatePageInfo();
@@ -817,6 +827,7 @@ class CitronReader {
     document.getElementById('btnNext').textContent = text.next;
     document.getElementById('btnZoomIn').textContent = text.zoomIn;
     document.getElementById('btnZoomOut').textContent = text.zoomOut;
+    document.getElementById('btnHighlight').textContent = text.highlight;
     document.getElementById('btnTheme').textContent = text.theme;
     document.getElementById('btnSettings').textContent = text.settings;
     
@@ -858,6 +869,286 @@ class CitronReader {
     // Apply to current frame
     const frame = document.getElementById('viewerFrame');
     this.applyStylesToFrame(frame);
+  }
+
+  // Toggle highlight mode on/off
+  toggleHighlightMode() {
+    this.highlightMode = !this.highlightMode;
+    const btn = document.getElementById('btnHighlight');
+    
+    if (this.highlightMode) {
+      btn.style.background = '#fff3cd';
+      btn.style.border = '2px solid #ffc107';
+      btn.title = this.settings.language === 'en' ? 'Click and drag to select text to highlight' : '点击并拖动选择文本进行高亮';
+      
+      // Add selection listener to iframe
+      this.setupHighlightSelectionListener();
+    } else {
+      btn.style.background = '';
+      btn.style.border = '';
+      btn.title = this.settings.language === 'en' ? 'Highlight Text' : '高亮文本';
+      
+      // Remove selection listener
+      this.removeHighlightSelectionListener();
+    }
+  }
+
+  // Setup listener for text selection in iframe
+  setupHighlightSelectionListener() {
+    const frame = document.getElementById('viewerFrame');
+    if (!frame || !frame.contentDocument) return;
+    
+    const doc = frame.contentDocument;
+    
+    // Store reference to remove later
+    this.highlightSelectionHandler = () => {
+      const selection = doc.getSelection();
+      if (selection && selection.toString().trim().length > 0) {
+        this.applyHighlight(selection);
+      }
+    };
+    
+    // Listen for mouseup (selection end)
+    doc.addEventListener('mouseup', this.highlightSelectionHandler);
+    this.highlightListenerElement = doc;
+  }
+
+  // Remove highlight selection listener
+  removeHighlightSelectionListener() {
+    if (this.highlightListenerElement && this.highlightSelectionHandler) {
+      this.highlightListenerElement.removeEventListener('mouseup', this.highlightSelectionHandler);
+      this.highlightListenerElement = null;
+      this.highlightSelectionHandler = null;
+    }
+  }
+
+  // Apply highlight to selected text
+  applyHighlight(selection) {
+    if (!this.highlightMode || !this.currentBookKey) return;
+    
+    const range = selection.getRangeAt(0);
+    const selectedText = selection.toString().trim();
+    
+    if (!selectedText) return;
+    
+    // Get chapter info
+    const chapterIndex = this.currentChapterIndex;
+    const chapterHref = this.chapters[chapterIndex]?.href || '';
+    
+    // Create highlight object
+    const highlight = {
+      id: 'hl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      text: selectedText,
+      chapterIndex: chapterIndex,
+      chapterHref: chapterHref,
+      timestamp: Date.now(),
+      // Store context for better re-finding
+      startOffset: range.startOffset,
+      endOffset: range.endOffset,
+      parentPath: this.getNodePath(range.startContainer)
+    };
+    
+    // Save highlight
+    this.saveHighlight(highlight);
+    
+    // Apply visual highlight immediately
+    this.addHighlightToDOM(range, highlight.id);
+    
+    // Clear selection
+    selection.removeAllRanges();
+    
+    // Turn off highlight mode after applying
+    this.toggleHighlightMode();
+    
+    console.log('Highlight saved:', highlight);
+  }
+
+  // Get path to node for reliable re-selection
+  getNodePath(node) {
+    const path = [];
+    let current = node;
+    
+    while (current && current.nodeType !== Node.DOCUMENT_NODE && current.parentElement) {
+      let index = 0;
+      let sibling = current;
+      while (sibling = sibling.previousSibling) {
+        if (sibling.nodeType === current.nodeType && sibling.nodeName === current.nodeName) {
+          index++;
+        }
+      }
+      path.unshift({
+        name: current.nodeName,
+        index: index,
+        id: current.id || null
+      });
+      current = current.parentElement;
+    }
+    
+    return path;
+  }
+
+  // Find node from path
+  findNodeFromPath(path, doc) {
+    if (!path || path.length === 0) return null;
+    
+    let current = doc.body;
+    for (let i = 0; i < path.length; i++) {
+      const step = path[i];
+      const children = Array.from(current.childNodes).filter(n => 
+        n.nodeName === step.name && (step.id === null || n.id === step.id)
+      );
+      
+      if (children.length > step.index) {
+        current = children[step.index];
+      } else {
+        return null;
+      }
+    }
+    
+    return current;
+  }
+
+  // Add highlight mark element to DOM
+  addHighlightToDOM(range, highlightId) {
+    try {
+      const mark = document.createElement('mark');
+      mark.className = 'citron-highlight';
+      mark.dataset.highlightId = highlightId;
+      mark.style.backgroundColor = '#ffeb3b';
+      mark.style.padding = '2px 0';
+      
+      range.surroundContents(mark);
+    } catch (e) {
+      console.warn('Could not apply highlight (complex selection):', e);
+      // Fallback: just save without visual for complex selections
+    }
+  }
+
+  // Save highlight to storage
+  saveHighlight(highlight) {
+    try {
+      const highlights = JSON.parse(localStorage.getItem(this.HIGHLIGHTS_KEY) || '{}');
+      
+      if (!highlights[this.currentBookKey]) {
+        highlights[this.currentBookKey] = [];
+      }
+      
+      highlights[this.currentBookKey].push(highlight);
+      localStorage.setItem(this.HIGHLIGHTS_KEY, JSON.stringify(highlights));
+    } catch (e) {
+      console.warn('Could not save highlight:', e);
+    }
+  }
+
+  // Load and apply all highlights for current book
+  loadAndApplyHighlights() {
+    if (!this.currentBookKey) return;
+    
+    try {
+      const highlights = JSON.parse(localStorage.getItem(this.HIGHLIGHTS_KEY) || '{}');
+      const bookHighlights = highlights[this.currentBookKey] || [];
+      
+      if (bookHighlights.length === 0) return;
+      
+      const frame = document.getElementById('viewerFrame');
+      if (!frame || !frame.contentDocument) return;
+      
+      const doc = frame.contentDocument;
+      
+      // Apply highlights for current chapter
+      const currentChapterHighlights = bookHighlights.filter(
+        h => h.chapterIndex === this.currentChapterIndex
+      );
+      
+      for (const highlight of currentChapterHighlights) {
+        this.applyExistingHighlight(doc, highlight);
+      }
+    } catch (e) {
+      console.warn('Could not load highlights:', e);
+    }
+  }
+
+  // Apply an existing highlight to the DOM
+  applyExistingHighlight(doc, highlight) {
+    try {
+      // Try to find the text node using the stored path and offset
+      const startNode = this.findNodeFromPath(highlight.parentPath, doc);
+      
+      if (startNode && startNode.childNodes.length > 0) {
+        // Find the text node
+        let textNode = null;
+        let charCount = 0;
+        
+        const findTextNode = (node) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            if (charCount + node.length >= highlight.startOffset) {
+              textNode = node;
+              return true;
+            }
+            charCount += node.length;
+          }
+          for (let child of node.childNodes) {
+            if (findTextNode(child)) return true;
+          }
+          return false;
+        };
+        
+        findTextNode(startNode);
+        
+        if (textNode) {
+          const range = doc.createRange();
+          range.setStart(textNode, highlight.startOffset - charCount);
+          range.setEnd(textNode, highlight.startOffset - charCount + (highlight.endOffset - highlight.startOffset));
+          this.addHighlightToDOM(range, highlight.id);
+        }
+      }
+      
+      // Fallback: search by text content
+      if (!startNode) {
+        const bodyText = doc.body.textContent;
+        const searchText = highlight.text;
+        const index = bodyText.indexOf(searchText);
+        
+        if (index !== -1) {
+          // Simple approach - find and highlight first occurrence
+          const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+          let node;
+          let currentPos = 0;
+          let foundStart = false;
+          let startNode = null;
+          let startOffset = 0;
+          let endNode = null;
+          let endOffset = 0;
+          
+          while (node = walker.nextNode()) {
+            const nodeLength = node.length;
+            
+            if (!foundStart && currentPos + nodeLength > index) {
+              startNode = node;
+              startOffset = index - currentPos;
+              foundStart = true;
+            }
+            
+            if (foundStart && currentPos + nodeLength >= index + searchText.length) {
+              endNode = node;
+              endOffset = index + searchText.length - currentPos;
+              break;
+            }
+            
+            currentPos += nodeLength;
+          }
+          
+          if (startNode && endNode) {
+            const range = doc.createRange();
+            range.setStart(startNode, startOffset);
+            range.setEnd(endNode, endOffset);
+            this.addHighlightToDOM(range, highlight.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not apply existing highlight:', e);
+    }
   }
 
   applyFontSize() {
