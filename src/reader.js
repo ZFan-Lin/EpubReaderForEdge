@@ -128,10 +128,6 @@ class CitronReader {
       if (mainFontSizeValueDropdown) {
         mainFontSizeValueDropdown.textContent = value + 'px';
       }
-      const fontSizeValueDisplay = document.getElementById('fontSizeValueDisplay');
-      if (fontSizeValueDisplay) {
-        fontSizeValueDisplay.textContent = value + 'px';
-      }
       this.settings.fontSize = value;
       this.saveSettings();
       this.applyFontSize();
@@ -628,9 +624,6 @@ class CitronReader {
     document.getElementById('btnTheme').textContent = text.theme;
     document.getElementById('btnSettings').textContent = text.settings;
     
-    // Update font size button display
-    document.getElementById('btnFontSize').innerHTML = '🔤 <span id="fontSizeValueDisplay">' + this.settings.fontSize + 'px</span>';
-    
     // Update sidebar title
     document.getElementById('tocTitle').textContent = text.tocTitle;
     
@@ -678,10 +671,6 @@ class CitronReader {
     if (fontSizeValue) {
       fontSizeValue.textContent = this.settings.fontSize + 'px';
     }
-    const fontSizeValueDisplay = document.getElementById('fontSizeValueDisplay');
-    if (fontSizeValueDisplay) {
-      fontSizeValueDisplay.textContent = this.settings.fontSize + 'px';
-    }
   }
 
   updatePageInfo() {
@@ -716,12 +705,6 @@ class CitronReader {
       document.body.classList.add('dark-theme');
     } else {
       document.body.classList.remove('dark-theme');
-    }
-    
-    // Update font size display in toolbar
-    const fontSizeValueDisplay = document.getElementById('fontSizeValueDisplay');
-    if (fontSizeValueDisplay) {
-      fontSizeValueDisplay.textContent = this.settings.fontSize + 'px';
     }
     
     // Update main font size slider in settings dropdown
