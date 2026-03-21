@@ -354,6 +354,13 @@ class CitronReader {
   }
 
   navigateToChapter(href) {
+    // Save current position before navigating
+    const frame = document.getElementById('viewerFrame');
+    if (frame && frame.contentDocument && this.currentBookKey) {
+      const location = this.getCurrentLocation(frame.contentDocument);
+      this.saveBookProgress(this.currentBookKey, location);
+    }
+    
     const chapterIndex = this.chapters.findIndex(ch => ch.href === href);
     if (chapterIndex !== -1) {
       this.loadChapter(chapterIndex);
@@ -555,31 +562,40 @@ class CitronReader {
             const doc = frame.contentDocument;
             const body = doc.body;
             
-            // Try as percentage of chapter (most common case)
-            const percentage = parseFloat(this.pendingLocation);
-            if (!isNaN(percentage) && percentage >= 0 && percentage <= 1) {
-              const scrollHeight = body.scrollHeight - body.clientHeight;
-              if (scrollHeight > 0) {
-                const targetScroll = scrollHeight * percentage;
-                doc.documentElement.scrollTop = targetScroll;
-                body.scrollTop = targetScroll;
-                console.log('Restored position using percentage:', percentage, 'scroll:', targetScroll);
+            // Use requestAnimationFrame to ensure DOM is fully rendered
+            const restorePosition = () => {
+              // Try as percentage of chapter (most common case)
+              const percentage = parseFloat(this.pendingLocation);
+              if (!isNaN(percentage) && percentage >= 0 && percentage <= 1) {
+                const scrollHeight = body.scrollHeight - body.clientHeight;
+                if (scrollHeight > 0) {
+                  const targetScroll = scrollHeight * percentage;
+                  doc.documentElement.scrollTop = targetScroll;
+                  body.scrollTop = targetScroll;
+                  console.log('Restored position using percentage:', percentage, 'scroll:', targetScroll, 'scrollHeight:', scrollHeight);
+                } else {
+                  // Scroll height not ready yet, try again shortly
+                  setTimeout(restorePosition, 50);
+                }
+              } else if (this.pendingLocation.startsWith('#')) {
+                // Try to navigate using element ID
+                const targetId = this.pendingLocation.substring(1);
+                const targetElement = doc.getElementById(targetId);
+                if (targetElement) {
+                  targetElement.scrollIntoView();
+                  console.log('Restored position using element ID');
+                }
+              } else {
+                // Try to parse as chapter index
+                const parsed = parseInt(this.pendingLocation);
+                if (!isNaN(parsed) && parsed >= 0 && parsed < this.chapters.length) {
+                  console.log('Chapter index position, already loaded chapter', parsed);
+                }
               }
-            } else if (this.pendingLocation.startsWith('#')) {
-              // Try to navigate using element ID
-              const targetId = this.pendingLocation.substring(1);
-              const targetElement = doc.getElementById(targetId);
-              if (targetElement) {
-                targetElement.scrollIntoView();
-                console.log('Restored position using element ID');
-              }
-            } else {
-              // Try to parse as chapter index
-              const parsed = parseInt(this.pendingLocation);
-              if (!isNaN(parsed) && parsed >= 0 && parsed < this.chapters.length) {
-                console.log('Chapter index position, already loaded chapter', parsed);
-              }
-            }
+            };
+            
+            // Start restoration after a short delay to ensure content is rendered
+            setTimeout(restorePosition, 100);
           } catch (e) {
             console.warn('Could not restore reading position:', e);
           }
@@ -622,12 +638,24 @@ class CitronReader {
 
   prevChapter() {
     if (this.currentChapterIndex > 0) {
+      // Save current position before changing chapter
+      const frame = document.getElementById('viewerFrame');
+      if (frame && frame.contentDocument && this.currentBookKey) {
+        const location = this.getCurrentLocation(frame.contentDocument);
+        this.saveBookProgress(this.currentBookKey, location);
+      }
       this.loadChapter(this.currentChapterIndex - 1);
     }
   }
 
   nextChapter() {
     if (this.currentChapterIndex < this.chapters.length - 1) {
+      // Save current position before changing chapter
+      const frame = document.getElementById('viewerFrame');
+      if (frame && frame.contentDocument && this.currentBookKey) {
+        const location = this.getCurrentLocation(frame.contentDocument);
+        this.saveBookProgress(this.currentBookKey, location);
+      }
       this.loadChapter(this.currentChapterIndex + 1);
     }
   }
