@@ -115,6 +115,8 @@ class CitronReader {
         } else {
           this.applyHighlightWithColor(color);
         }
+        // Close color picker after selection
+        this.hideHighlightColorPicker();
       });
     });
     
@@ -145,7 +147,7 @@ class CitronReader {
           }
         }
       }
-    });
+    }, { capture: true });
 
     // Theme
     document.getElementById('btnTheme').addEventListener('click', () => this.toggleTheme());
@@ -197,7 +199,7 @@ class CitronReader {
           !dropdown.contains(e.target) && !btnSettings.contains(e.target)) {
         this.closeSettingsDropdown();
       }
-    });
+    }, { capture: true });
 
     // Drag and drop
     const contentArea = document.getElementById('contentArea');
