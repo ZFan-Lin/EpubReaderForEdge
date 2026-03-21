@@ -361,7 +361,7 @@ class CitronReader {
       const frame = document.getElementById('viewerFrame');
       if (frame && frame.contentDocument && frame.contentDocument.body && 
           frame.contentDocument.body.scrollHeight > 0 && this.currentBookKey) {
-        const location = this.getCurrentLocation(frame.contentDocument);
+        const location = this.getCurrentLocation(frame);
         this.saveBookProgress(this.currentBookKey, location);
       }
       this.loadChapter(chapterIndex);
@@ -693,7 +693,7 @@ class CitronReader {
       // Save current position before changing chapter
       const frame = document.getElementById('viewerFrame');
       if (frame && frame.contentDocument && this.currentBookKey) {
-        const location = this.getCurrentLocation(frame.contentDocument);
+        const location = this.getCurrentLocation(frame);
         this.saveBookProgress(this.currentBookKey, location);
       }
       this.loadChapter(this.currentChapterIndex - 1);
@@ -705,7 +705,7 @@ class CitronReader {
       // Save current position before changing chapter
       const frame = document.getElementById('viewerFrame');
       if (frame && frame.contentDocument && this.currentBookKey) {
-        const location = this.getCurrentLocation(frame.contentDocument);
+        const location = this.getCurrentLocation(frame);
         this.saveBookProgress(this.currentBookKey, location);
       }
       this.loadChapter(this.currentChapterIndex + 1);
@@ -730,7 +730,7 @@ class CitronReader {
     // Save current position when toggling sidebar
     const frame = document.getElementById('viewerFrame');
     if (frame && frame.contentDocument && this.currentBookKey) {
-      const location = this.getCurrentLocation(frame.contentDocument);
+      const location = this.getCurrentLocation(frame);
       this.saveBookProgress(this.currentBookKey, location);
     }
   }
