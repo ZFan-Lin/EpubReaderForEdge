@@ -51,7 +51,7 @@
 ## 项目结构
 
 ```
-EpubReaderForEdge/
+CitronReader/
 ├── manifest.json          # 扩展配置文件
 ├── src/
 │   ├── reader.html        # 阅读器主页面

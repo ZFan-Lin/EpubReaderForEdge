@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Epub Reader for Edge",
+  "name": "Citron Reader",
   "version": "1.0.0",
   "description": "A powerful EPUB reader extension for Microsoft Edge, inspired by Calibre's viewer",
   "permissions": [

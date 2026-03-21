@@ -1,7 +1,7 @@
-// Epub Reader for Edge - Main Reader Script
+// Citron Reader - Main Reader Script
 // Inspired by Calibre's EPUB viewer
 
-class EpubReader {
+class CitronReader {
   constructor() {
     this.zip = null;
     this.epubData = {};
@@ -19,7 +19,7 @@ class EpubReader {
       language: 'en'
     };
     
-    this.HISTORY_KEY = 'epub_reader_history';
+    this.HISTORY_KEY = 'citron_reader_history';
     
     this.uiText = {
       en: {
@@ -32,7 +32,7 @@ class EpubReader {
         theme: '🌙',
         settings: '⚙️',
         tocTitle: 'Table of Contents',
-        welcomeTitle: 'Welcome to Epub Reader for Edge',
+        welcomeTitle: 'Welcome to Citron Reader',
         welcomeText: 'Click "Open" to load an EPUB file, or drag and drop an EPUB file here.',
         settingsTitle: 'Settings',
         tocFontSizeLabel: 'TOC Font Size:',
@@ -49,7 +49,7 @@ class EpubReader {
         theme: '🌙',
         settings: '⚙️',
         tocTitle: '目录',
-        welcomeTitle: '欢迎使用 Edge EPUB 阅读器',
+        welcomeTitle: '欢迎使用 Citron Reader',
         welcomeText: '点击"打开"加载 EPUB 文件，或将 EPUB 文件拖放到此处。',
         settingsTitle: '设置',
         tocFontSizeLabel: '目录字体大小:',
@@ -696,11 +696,11 @@ class EpubReader {
   }
 
   saveSettings() {
-    localStorage.setItem('epubReaderSettings', JSON.stringify(this.settings));
+    localStorage.setItem('citronReaderSettings', JSON.stringify(this.settings));
   }
 
   loadSettings() {
-    const saved = localStorage.getItem('epubReaderSettings');
+    const saved = localStorage.getItem('citronReaderSettings');
     if (saved) {
       try {
         this.settings = { ...this.settings, ...JSON.parse(saved) };
@@ -853,5 +853,5 @@ class EpubReader {
 
 // Initialize reader when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  window.reader = new EpubReader();
+  window.reader = new CitronReader();
 });

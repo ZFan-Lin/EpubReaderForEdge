@@ -1,6 +1,6 @@
-// Background service worker for Epub Reader
+// Background service worker for Citron Reader
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('Epub Reader installed');
+  console.log('Citron Reader installed');
 });
 
 // Handle EPUB file associations if configured
