@@ -21,9 +21,12 @@ class CitronReader {
     
     this.HISTORY_KEY = 'citron_reader_history';
     this.HIGHLIGHTS_KEY = 'citron_reader_highlights';
+    this.NOTES_KEY = 'citron_reader_notes';
     this.highlightMode = false;
     this.iframeClickListener = null;
     this.previousViewerFrame = null;
+    this.notePopover = null;
+    this.currentNoteHighlightId = null;
     
     this.uiText = {
       en: {
@@ -34,6 +37,7 @@ class CitronReader {
         zoomIn: '🔍+',
         zoomOut: '🔍-',
         highlight: 'Highlight',
+        note: '📝 Note',
         theme: '🌙',
         settings: '⚙️',
         tocTitle: 'Table of Contents',
@@ -52,6 +56,7 @@ class CitronReader {
         zoomIn: '🔍+',
         zoomOut: '🔍-',
         highlight: '高亮',
+        note: '📝 笔记',
         theme: '🌙',
         settings: '⚙️',
         tocTitle: '目录',
@@ -124,6 +129,12 @@ class CitronReader {
     document.getElementById('btnHighlight').addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleHighlightColorPicker();
+    });
+    
+    // Note button - add note to selected text
+    document.getElementById('btnNote').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openNoteForSelection();
     });
     
     // Close color picker when clicking outside (but not when clicking on the color picker itself)
@@ -759,6 +770,12 @@ class CitronReader {
         
         // Load and apply highlights for current chapter
         this.loadAndApplyHighlights();
+        
+        // Load and apply note indicators
+        this.loadAndApplyNoteIndicators();
+        
+        // Setup click listeners on highlights to show notes
+        this.setupHighlightClickListeners(frame);
       };
       
       this.updatePageInfo();
@@ -924,6 +941,7 @@ class CitronReader {
     document.getElementById('btnZoomIn').textContent = text.zoomIn;
     document.getElementById('btnZoomOut').textContent = text.zoomOut;
     document.getElementById('btnHighlight').textContent = text.highlight;
+    document.getElementById('btnNote').textContent = text.note;
     document.getElementById('btnTheme').textContent = text.theme;
     document.getElementById('btnSettings').textContent = text.settings;
     
@@ -1721,6 +1739,271 @@ class CitronReader {
     } catch (e) {
       console.warn('getCurrentLocation error:', e);
       return { type: 'percent', value: 0 };
+    }
+  }
+
+  // Open note popover for current selection
+  openNoteForSelection() {
+    const frame = document.getElementById('viewerFrame');
+    if (!frame || !frame.contentDocument) return;
+    
+    const doc = frame.contentDocument;
+    const selection = doc.getSelection();
+    
+    if (!selection || !selection.toString().trim()) {
+      // No valid selection, hide any existing popover
+      this.closeNotePopover();
+      return;
+    }
+    
+    // Find the highlight element that contains this selection
+    const range = selection.getRangeAt(0);
+    let highlightEl = null;
+    
+    // Check if selection is within a highlight mark
+    if (range.commonAncestorContainer.nodeType === Node.TEXT_NODE) {
+      highlightEl = range.commonAncestorContainer.parentElement.closest('mark.citron-highlight');
+    } else if (range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE) {
+      highlightEl = range.commonAncestorContainer.closest('mark.citron-highlight');
+    }
+    
+    if (highlightEl && highlightEl.dataset.highlightId) {
+      // Selection is within an existing highlight, show/edit note for it
+      this.showNotePopover(highlightEl.dataset.highlightId, highlightEl);
+    } else {
+      // Selection is not highlighted yet, show message to highlight first
+      alert(this.settings.language === 'en' 
+        ? 'Please highlight the text first before adding a note.' 
+        : '请先高亮文本，然后再添加笔记。');
+    }
+    
+    // Hide color picker if open
+    this.hideHighlightColorPicker();
+  }
+
+  // Show note popover for an existing highlight
+  showNotePopover(highlightId, highlightEl) {
+    this.currentNoteHighlightId = highlightId;
+    
+    // Get existing note data
+    const notes = JSON.parse(localStorage.getItem(this.NOTES_KEY) || '{}');
+    const bookNotes = notes[this.currentBookKey] || {};
+    const noteData = bookNotes[highlightId];
+    
+    // Create popover if it doesn't exist
+    if (!this.notePopover) {
+      this.createNotePopover();
+    }
+    
+    // Populate popover content
+    const highlightText = highlightEl.textContent.trim().substring(0, 100);
+    this.notePopover.querySelector('.note-highlight-text').textContent = highlightText;
+    
+    const textarea = this.notePopover.querySelector('.note-textarea');
+    textarea.value = noteData ? noteData.content : '';
+    textarea.placeholder = this.settings.language === 'en' 
+      ? 'Add your note here...' 
+      : '在此添加笔记...';
+    
+    // Update character count
+    this.updateNoteCharCount(textarea.value.length);
+    
+    // Position popover near the highlight
+    this.positionNotePopover(highlightEl);
+    
+    // Show popover
+    this.notePopover.classList.add('active');
+    
+    // Focus textarea if no existing note
+    if (!noteData) {
+      textarea.focus();
+    }
+  }
+
+  // Create note popover DOM element
+  createNotePopover() {
+    const popover = document.createElement('div');
+    popover.className = 'note-popover';
+    popover.innerHTML = `
+      <div class="note-highlight-text"></div>
+      <textarea class="note-textarea" maxlength="500" rows="4"></textarea>
+      <div class="note-char-count"><span class="note-char-current">0</span>/500</div>
+      <div class="note-actions">
+        <button class="note-btn note-btn-cancel">${this.settings.language === 'en' ? 'Cancel' : '取消'}</button>
+        <button class="note-btn note-btn-save">${this.settings.language === 'en' ? 'Done' : '完成'}</button>
+      </div>
+    `;
+    
+    document.body.appendChild(popover);
+    this.notePopover = popover;
+    
+    // Bind events
+    const textarea = popover.querySelector('.note-textarea');
+    textarea.addEventListener('input', (e) => {
+      this.updateNoteCharCount(e.target.value.length);
+    });
+    
+    popover.querySelector('.note-btn-save').addEventListener('click', () => {
+      this.saveCurrentNote();
+    });
+    
+    popover.querySelector('.note-btn-cancel').addEventListener('click', () => {
+      this.closeNotePopover();
+    });
+    
+    // Close on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.notePopover && this.notePopover.classList.contains('active')) {
+        this.closeNotePopover();
+      }
+    });
+  }
+
+  // Update character count display
+  updateNoteCharCount(count) {
+    if (this.notePopover) {
+      this.notePopover.querySelector('.note-char-current').textContent = count;
+    }
+  }
+
+  // Position popover near highlight element
+  positionNotePopover(highlightEl) {
+    if (!this.notePopover) return;
+    
+    const rect = highlightEl.getBoundingClientRect();
+    const popoverRect = this.notePopover.getBoundingClientRect();
+    
+    // Calculate position - try below first, then above if needed
+    let top = rect.bottom + window.scrollY + 8;
+    let left = rect.left + window.scrollX;
+    
+    // Check if popover would go below viewport
+    if (top + popoverRect.height > window.scrollY + window.innerHeight) {
+      // Try positioning above
+      top = rect.top + window.scrollY - popoverRect.height - 8;
+    }
+    
+    // Ensure popover doesn't go off right edge
+    if (left + popoverRect.width > window.scrollX + window.innerWidth) {
+      left = window.scrollX + window.innerWidth - popoverRect.width - 10;
+    }
+    
+    // Ensure popover doesn't go off left edge
+    if (left < window.scrollX) {
+      left = window.scrollX + 10;
+    }
+    
+    this.notePopover.style.top = top + 'px';
+    this.notePopover.style.left = left + 'px';
+  }
+
+  // Save current note
+  saveCurrentNote() {
+    if (!this.currentNoteHighlightId || !this.notePopover) return;
+    
+    const textarea = this.notePopover.querySelector('.note-textarea');
+    const content = textarea.value.trim();
+    
+    // Get or create notes structure
+    const notes = JSON.parse(localStorage.getItem(this.NOTES_KEY) || '{}');
+    if (!notes[this.currentBookKey]) {
+      notes[this.currentBookKey] = {};
+    }
+    
+    if (content) {
+      // Save note
+      notes[this.currentBookKey][this.currentNoteHighlightId] = {
+        content: content,
+        updatedAt: Date.now()
+      };
+      
+      // Add visual indicator to highlight
+      this.addNoteIndicatorToHighlight(this.currentNoteHighlightId);
+    } else {
+      // Delete note if empty
+      delete notes[this.currentBookKey][this.currentNoteHighlightId];
+      
+      // Remove visual indicator from highlight
+      this.removeNoteIndicatorFromHighlight(this.currentNoteHighlightId);
+    }
+    
+    localStorage.setItem(this.NOTES_KEY, JSON.stringify(notes));
+    
+    this.closeNotePopover();
+  }
+
+  // Add note indicator (micro-badge) to highlight
+  addNoteIndicatorToHighlight(highlightId) {
+    const frame = document.getElementById('viewerFrame');
+    if (!frame || !frame.contentDocument) return;
+    
+    const markEl = frame.contentDocument.querySelector(`mark.citron-highlight[data-highlight-id="${highlightId}"]`);
+    if (markEl && !markEl.classList.contains('has-note')) {
+      markEl.classList.add('has-note');
+    }
+  }
+
+  // Remove note indicator from highlight
+  removeNoteIndicatorFromHighlight(highlightId) {
+    const frame = document.getElementById('viewerFrame');
+    if (!frame || !frame.contentDocument) return;
+    
+    const markEl = frame.contentDocument.querySelector(`mark.citron-highlight[data-highlight-id="${highlightId}"]`);
+    if (markEl) {
+      markEl.classList.remove('has-note');
+    }
+  }
+
+  // Close note popover
+  closeNotePopover() {
+    if (this.notePopover) {
+      this.notePopover.classList.remove('active');
+    }
+    this.currentNoteHighlightId = null;
+  }
+
+  // Load and apply note indicators when chapter loads
+  loadAndApplyNoteIndicators() {
+    if (!this.currentBookKey) return;
+    
+    try {
+      const notes = JSON.parse(localStorage.getItem(this.NOTES_KEY) || '{}');
+      const bookNotes = notes[this.currentBookKey] || {};
+      
+      if (Object.keys(bookNotes).length === 0) return;
+      
+      const frame = document.getElementById('viewerFrame');
+      if (!frame || !frame.contentDocument) return;
+      
+      // Apply indicators to highlights that have notes
+      for (const highlightId of Object.keys(bookNotes)) {
+        this.addNoteIndicatorToHighlight(highlightId);
+      }
+    } catch (e) {
+      console.warn('Could not load note indicators:', e);
+    }
+  }
+
+  // Setup click listener on highlights to show notes
+  setupHighlightClickListeners(frame) {
+    try {
+      const doc = frame.contentDocument || frame.contentWindow.document;
+      if (!doc) return;
+      
+      // Use event delegation for highlight clicks
+      doc.addEventListener('click', (e) => {
+        const highlightEl = e.target.closest('mark.citron-highlight');
+        if (highlightEl && highlightEl.dataset.highlightId) {
+          // Check if click is a simple click (not part of a selection)
+          const selection = doc.getSelection();
+          if (selection.isCollapsed) {
+            // Simple click, show note popover
+            this.showNotePopover(highlightEl.dataset.highlightId, highlightEl);
+          }
+        }
+      }, { capture: true });
+    } catch (e) {
+      console.warn('Could not setup highlight click listeners:', e);
     }
   }
 }
