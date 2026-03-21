@@ -1949,26 +1949,26 @@ class CitronReader {
     }
   }
 
-  // Position popover to the LEFT or BOTTOM-LEFT of highlight element
+  // Position popover to the RIGHT or BOTTOM-RIGHT of highlight element
   positionNotePopover(highlightEl) {
     if (!this.notePopover) return;
     
     const rect = highlightEl.getBoundingClientRect();
     const popoverRect = this.notePopover.getBoundingClientRect();
     
-    // Calculate position - try LEFT first, then BOTTOM-LEFT if needed
+    // Calculate position - try RIGHT first, then BOTTOM-RIGHT if needed
     let top = rect.top + window.scrollY;
-    let left = rect.left + window.scrollX - popoverRect.width - 8;
+    let left = rect.right + window.scrollX + 8;
     
-    // Check if popover would go off left edge
-    if (left < window.scrollX) {
-      // Try positioning at BOTTOM-LEFT
-      left = rect.left + window.scrollX;
+    // Check if popover would go off right edge
+    if (left + popoverRect.width > window.scrollX + window.innerWidth) {
+      // Try positioning at BOTTOM-RIGHT
+      left = rect.right + window.scrollX - popoverRect.width;
       top = rect.bottom + window.scrollY + 8;
       
-      // Check if bottom-left would go below viewport
+      // Check if bottom-right would go below viewport
       if (top + popoverRect.height > window.scrollY + window.innerHeight) {
-        // Fallback: position at TOP-LEFT
+        // Fallback: position at TOP-RIGHT
         top = rect.top + window.scrollY - popoverRect.height - 8;
       }
     }
@@ -1978,9 +1978,9 @@ class CitronReader {
       top = window.scrollY + 10;
     }
     
-    // Ensure popover doesn't go off right edge
-    if (left + popoverRect.width > window.scrollX + window.innerWidth) {
-      left = window.scrollX + window.innerWidth - popoverRect.width - 10;
+    // Ensure popover doesn't go off left edge
+    if (left < window.scrollX) {
+      left = window.scrollX + 10;
     }
     
     this.notePopover.style.top = top + 'px';
