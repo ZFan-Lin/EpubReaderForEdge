@@ -931,10 +931,7 @@ class CitronReader {
 
   // Setup auto-save of reading position
   setupAutoSave(frame) {
-    if (!frame || !frame.contentDocument) return;
-    
-    const doc = frame.contentDocument;
-    const body = doc.body;
+    if (!frame) return;
     
     // Debounce function to avoid saving too frequently
     let saveTimeout = null;
@@ -942,30 +939,42 @@ class CitronReader {
       if (saveTimeout) clearTimeout(saveTimeout);
       saveTimeout = setTimeout(() => {
         if (this.currentBookKey) {
-          const location = this.getCurrentLocation(doc);
+          const location = this.getCurrentLocation(frame);
           this.saveBookProgress(this.currentBookKey, location);
         }
       }, 500);
     };
     
-    // Listen for scroll events in the iframe
+    // Listen for scroll events on the iframe element itself
     try {
-      doc.addEventListener('scroll', debouncedSave, true);
+      frame.addEventListener('scroll', debouncedSave, true);
     } catch (e) {
-      console.warn('Could not add scroll listener to document:', e);
+      console.warn('Could not add scroll listener to iframe:', e);
     }
-    if (body) {
+    
+    // Also listen to internal document scroll for compatibility
+    if (frame.contentDocument) {
+      const doc = frame.contentDocument;
+      const body = doc.body;
+      
       try {
-        body.addEventListener('scroll', debouncedSave, true);
+        doc.addEventListener('scroll', debouncedSave, true);
       } catch (e) {
-        console.warn('Could not add scroll listener to body:', e);
+        console.warn('Could not add scroll listener to document:', e);
+      }
+      if (body) {
+        try {
+          body.addEventListener('scroll', debouncedSave, true);
+        } catch (e) {
+          console.warn('Could not add scroll listener to body:', e);
+        }
       }
     }
     
     // Also save when leaving the page or closing tab
     window.addEventListener('beforeunload', () => {
       if (this.currentBookKey) {
-        const location = this.getCurrentLocation(doc);
+        const location = this.getCurrentLocation(frame);
         this.saveBookProgress(this.currentBookKey, location);
       }
     });
@@ -975,8 +984,15 @@ class CitronReader {
   }
 
   // Get current reading location as percentage or element ID
-  getCurrentLocation(doc) {
+  getCurrentLocation(frame) {
     try {
+      if (!frame) {
+        console.warn('getCurrentLocation: frame not available');
+        return '0';
+      }
+      
+      // For iframe-based content, we need to check the iframe's scroll position
+      const doc = frame.contentDocument;
       if (!doc || !doc.body) {
         console.warn('getCurrentLocation: Document or body not available');
         return '0';
