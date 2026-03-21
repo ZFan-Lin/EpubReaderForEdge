@@ -306,11 +306,18 @@ class CitronReader {
         const ncxDoc = parser.parseFromString(ncxContent, 'text/xml');
         
         this.toc = [];
-        ncxDoc.querySelectorAll('navMap navPoint').forEach(navPoint => {
-          const label = navPoint.querySelector('navLabel text')?.textContent || 'Untitled';
-          const src = navPoint.querySelector('content')?.getAttribute('src');
-          if (src) {
-            this.toc.push({ label, src: basePath + src });
+        const navPoints = ncxDoc.querySelectorAll('navMap navPoint');
+        navPoints.forEach(navPoint => {
+          try {
+            const labelElement = navPoint.querySelector('navLabel text');
+            const label = labelElement ? labelElement.textContent || 'Untitled' : 'Untitled';
+            const contentElement = navPoint.querySelector('content');
+            const src = contentElement ? contentElement.getAttribute('src') : null;
+            if (src) {
+              this.toc.push({ label, src: basePath + src });
+            }
+          } catch (e) {
+            console.warn('Error parsing a navPoint:', e);
           }
         });
       } catch (e) {
@@ -318,7 +325,41 @@ class CitronReader {
       }
     }
     
-    // If no NCX, use chapters as TOC
+    // If no NCX or NCX parsing failed, try EPUB3 NAV document
+    if (this.toc.length === 0) {
+      const navItem = Array.from(opfDoc.querySelectorAll('manifest item'))
+        .find(item => item.getAttribute('media-type') === 'application/xhtml+xml' && 
+                      item.getAttribute('properties')?.includes('nav'));
+      
+      if (navItem) {
+        const navPath = basePath + navItem.getAttribute('href');
+        try {
+          const navContent = await this.zip.file(navPath).async('text');
+          const parser = new DOMParser();
+          const navDoc = parser.parseFromString(navContent, 'application/xhtml+xml');
+          
+          this.toc = [];
+          const navLinks = navDoc.querySelectorAll('nav[epub\\:type="toc"] li a, nav[type="toc"] li a');
+          navLinks.forEach(link => {
+            try {
+              const label = link.textContent?.trim() || 'Untitled';
+              const href = link.getAttribute('href');
+              if (href) {
+                // Resolve relative href if needed
+                const resolvedHref = href.startsWith('http') ? href : basePath + href;
+                this.toc.push({ label, src: resolvedHref });
+              }
+            } catch (e) {
+              console.warn('Error parsing a NAV link:', e);
+            }
+          });
+        } catch (e) {
+          console.warn('Could not parse NAV document:', e);
+        }
+      }
+    }
+    
+    // If still no TOC, use chapters as TOC
     if (this.toc.length === 0) {
       this.toc = this.chapters.map((chapter, index) => ({
         label: `Chapter ${index + 1}`,
