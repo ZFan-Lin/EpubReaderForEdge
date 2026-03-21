@@ -22,6 +22,8 @@ class CitronReader {
     this.HISTORY_KEY = 'citron_reader_history';
     this.HIGHLIGHTS_KEY = 'citron_reader_highlights';
     this.highlightMode = false;
+    this.iframeClickListener = null;
+    this.previousViewerFrame = null;
     
     this.uiText = {
       en: {
@@ -648,6 +650,17 @@ class CitronReader {
       frame.onload = () => {
         this.applyStylesToFrame(frame);
         
+        // Remove old iframe click listener before adding new one
+        const oldFrame = this.previousViewerFrame;
+        if (oldFrame && oldFrame.contentDocument && this.iframeClickListener) {
+          try {
+            oldFrame.contentDocument.removeEventListener('click', this.iframeClickListener, { capture: true });
+          } catch (e) {
+            // Ignore errors from old frame
+          }
+        }
+        this.previousViewerFrame = frame;
+        
         // Add click listener to iframe content to close popups when clicking inside the book
         this.addIframeClickListeners(frame);
         
@@ -995,7 +1008,8 @@ class CitronReader {
       return;
     }
     
-    const range = selection.getRangeAt(0);
+    // Clone the range before any DOM manipulation
+    const originalRange = selection.getRangeAt(0).cloneRange();
     const selectedText = selection.toString().trim();
     
     // Get chapter info
@@ -1010,24 +1024,29 @@ class CitronReader {
       chapterIndex: chapterIndex,
       chapterHref: chapterHref,
       timestamp: Date.now(),
-      startOffset: range.startOffset,
-      endOffset: range.endOffset,
-      parentPath: this.getNodePath(range.startContainer)
+      startOffset: originalRange.startOffset,
+      endOffset: originalRange.endOffset,
+      parentPath: this.getNodePath(originalRange.startContainer)
     };
     
-    // Save highlight
+    // Save highlight first (before DOM manipulation)
     this.saveHighlight(highlight);
     
-    // Apply visual highlight immediately
-    this.addHighlightToDOM(range, highlight.id, color);
+    // Apply visual highlight using the cloned range
+    const success = this.addHighlightToDOM(originalRange, highlight.id, color);
     
-    // Clear selection
-    selection.removeAllRanges();
+    if (success) {
+      // Clear selection only after successful highlight
+      selection.removeAllRanges();
+      console.log('Highlight saved:', highlight);
+    } else {
+      // If highlighting failed, remove from storage
+      this.deleteHighlightById(highlight.id);
+      console.warn('Highlight failed, removed from storage');
+    }
     
     // Hide color picker
     this.hideHighlightColorPicker();
-    
-    console.log('Highlight saved:', highlight);
   }
 
   hideHighlightColorPicker() {
@@ -1049,19 +1068,12 @@ class CitronReader {
       }
       
       this.iframeClickListener = (e) => {
-        // Close color picker if open - clicking in iframe should close it
+        // Close color picker if open - clicking in iframe should close it without clearing selection
         const colorPicker = document.getElementById('highlightColorPicker');
         if (colorPicker && colorPicker.classList.contains('active')) {
           colorPicker.classList.remove('active');
-          // Clear selection in iframe only when closing the color picker
-          try {
-            const selection = doc.getSelection();
-            if (selection) {
-              selection.removeAllRanges();
-            }
-          } catch (err) {
-            // Ignore errors
-          }
+          // Don't clear selection here - let the user's original selection remain
+          // The selection will be cleared only after successfully applying a highlight
           return; // Stop processing after closing color picker
         }
         
@@ -1148,7 +1160,7 @@ class CitronReader {
     try {
       // Check if range is valid
       if (!range || range.collapsed) {
-        return;
+        return false;
       }
       
       // Try simple approach first for single text node selections
@@ -1162,7 +1174,7 @@ class CitronReader {
         mark.dataset.highlightId = highlightId;
         mark.dataset.color = color;
         range.surroundContents(mark);
-        return;
+        return true;
       }
       
       // For complex selections spanning multiple nodes, use extractContents/insertNode approach
@@ -1181,9 +1193,12 @@ class CitronReader {
       if (parent) {
         parent.normalize();
       }
+      
+      return true;
     } catch (e) {
       console.warn('Could not apply highlight (complex selection):', e);
       // Fallback: just save without visual for complex selections
+      return false;
     }
   }
 
