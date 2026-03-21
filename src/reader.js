@@ -108,7 +108,11 @@ class CitronReader {
       option.addEventListener('click', (e) => {
         e.stopPropagation();
         const color = option.dataset.color;
-        this.applyHighlightWithColor(color);
+        if (color === 'remove') {
+          this.removeHighlightFromSelection();
+        } else {
+          this.applyHighlightWithColor(color);
+        }
       });
     });
     
@@ -119,12 +123,21 @@ class CitronReader {
     });
     
     // Close color picker when clicking outside (but not when clicking on the color picker itself)
+    // Also cancel highlight operation if clicking elsewhere without selecting a color
     document.addEventListener('click', (e) => {
       const colorPicker = document.getElementById('highlightColorPicker');
       const btnHighlight = document.getElementById('btnHighlight');
       if (colorPicker && colorPicker.classList.contains('active') && 
           !colorPicker.contains(e.target) && !btnHighlight.contains(e.target)) {
         colorPicker.classList.remove('active');
+        // Clear selection in iframe to cancel highlight operation
+        const frame = document.getElementById('viewerFrame');
+        if (frame && frame.contentDocument) {
+          const selection = frame.contentDocument.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+          }
+        }
       }
     });
 
@@ -1117,6 +1130,81 @@ class CitronReader {
     } catch (e) {
       console.warn('Could not apply highlight (complex selection):', e);
       // Fallback: just save without visual for complex selections
+    }
+  }
+
+  // Remove highlight from selected text
+  removeHighlightFromSelection() {
+    const frame = document.getElementById('viewerFrame');
+    if (!frame || !frame.contentDocument) return;
+    
+    const doc = frame.contentDocument;
+    const selection = doc.getSelection();
+    
+    if (!selection || !selection.toString().trim()) {
+      // No valid selection
+      this.hideHighlightColorPicker();
+      return;
+    }
+    
+    const range = selection.getRangeAt(0);
+    const selectedText = selection.toString().trim();
+    
+    // Find and remove any highlights that overlap with the current selection
+    try {
+      // Get all mark elements in the current selection
+      const marksInRange = doc.querySelectorAll('mark.citron-highlight');
+      
+      for (const mark of marksInRange) {
+        const markRange = doc.createRange();
+        markRange.selectNodeContents(mark);
+        
+        // Check if the mark overlaps with the selection
+        if (range.compareBoundaryPoints(Range.END_TO_START, markRange) < 0 &&
+            range.compareBoundaryPoints(Range.START_TO_END, markRange) > 0) {
+          // The mark is within or overlaps with the selection
+          const highlightId = mark.dataset.highlightId;
+          
+          // Remove the mark element and unwrap its contents
+          const parent = mark.parentNode;
+          while (mark.firstChild) {
+            parent.insertBefore(mark.firstChild, mark);
+          }
+          parent.removeChild(mark);
+          parent.normalize();
+          
+          // Remove from storage
+          if (highlightId && this.currentBookKey) {
+            this.deleteHighlightById(highlightId);
+          }
+        }
+      }
+      
+      // Clear selection
+      selection.removeAllRanges();
+      
+      // Hide color picker
+      this.hideHighlightColorPicker();
+      
+      console.log('Highlight removed from selection');
+    } catch (e) {
+      console.warn('Could not remove highlight:', e);
+    }
+  }
+  
+  // Delete a highlight by ID from storage
+  deleteHighlightById(highlightId) {
+    try {
+      const highlights = JSON.parse(localStorage.getItem(this.HIGHLIGHTS_KEY) || '{}');
+      
+      if (highlights[this.currentBookKey]) {
+        highlights[this.currentBookKey] = highlights[this.currentBookKey].filter(
+          h => h.id !== highlightId
+        );
+        localStorage.setItem(this.HIGHLIGHTS_KEY, JSON.stringify(highlights));
+      }
+    } catch (e) {
+      console.warn('Could not delete highlight:', e);
     }
   }
 
