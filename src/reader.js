@@ -836,10 +836,12 @@ class CitronReader {
             background-color: #f57c00 !important;
           }
           mark.citron-highlight.has-note {
-            border-bottom: 2px solid rgba(0, 0, 0, 0.4);
+            border-bottom: 2px solid #4285f4;
+            background-color: transparent !important;
           }
           body.dark-theme mark.citron-highlight.has-note {
-            border-bottom: 2px solid rgba(255, 255, 255, 0.6);
+            border-bottom: 2px solid #8ab4f8;
+            background-color: transparent !important;
           }
         `;
         if (doc.head) {
@@ -1210,6 +1212,10 @@ class CitronReader {
       const startContainer = range.startContainer;
       const endContainer = range.endContainer;
       
+      // Determine the class name based on color
+      // If color is null/empty, don't add a color class (for note-only highlights)
+      const colorClass = color ? color : '';
+      
       // Case 1: Single text node selection - simplest and most common case
       if (startContainer === endContainer && startContainer.nodeType === Node.TEXT_NODE) {
         const text = startContainer.textContent;
@@ -1232,9 +1238,12 @@ class CitronReader {
         }
         
         const mark = document.createElement('mark');
-        mark.classList.add('citron-highlight', color);
+        mark.classList.add('citron-highlight');
+        if (colorClass) {
+          mark.classList.add(colorClass);
+        }
         mark.dataset.highlightId = highlightId;
-        mark.dataset.color = color;
+        mark.dataset.color = color || '';
         mark.textContent = selectedText;
         frag.appendChild(mark);
         
@@ -1326,9 +1335,12 @@ class CitronReader {
         }
         
         const mark = document.createElement('mark');
-        mark.classList.add('citron-highlight', color);
+        mark.classList.add('citron-highlight');
+        if (colorClass) {
+          mark.classList.add(colorClass);
+        }
         mark.dataset.highlightId = highlightId;
-        mark.dataset.color = color;
+        mark.dataset.color = color || '';
         mark.textContent = selectedText;
         frag.appendChild(mark);
         
@@ -1795,16 +1807,16 @@ class CitronReader {
       // Selection is within an existing highlight, show/edit note for it
       this.showNotePopover(highlightEl.dataset.highlightId, highlightEl);
     } else {
-      // Selection is not highlighted yet, create a default highlight first
+      // Selection is not highlighted yet, create a default highlight with NO background color
       const selectedText = selection.toString().trim();
       const chapterIndex = this.currentChapterIndex;
       const chapterHref = this.chapters[chapterIndex]?.href || '';
       
-      // Create highlight object with default yellow color
+      // Create highlight object - no color means underline only
       const highlight = {
         id: 'hl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
         text: selectedText,
-        color: 'yellow',
+        color: null, // null color means no background, just underline for notes
         chapterIndex: chapterIndex,
         chapterHref: chapterHref,
         timestamp: Date.now(),
@@ -1816,8 +1828,8 @@ class CitronReader {
       // Save highlight first
       this.saveHighlight(highlight);
       
-      // Apply visual highlight
-      const success = this.addHighlightToDOM(range, highlight.id, 'yellow');
+      // Apply visual highlight with no background (just creates the mark element)
+      const success = this.addHighlightToDOM(range, highlight.id, null);
       
       if (success) {
         // Clear selection
@@ -1927,31 +1939,38 @@ class CitronReader {
     }
   }
 
-  // Position popover near highlight element
+  // Position popover to the LEFT or BOTTOM-LEFT of highlight element
   positionNotePopover(highlightEl) {
     if (!this.notePopover) return;
     
     const rect = highlightEl.getBoundingClientRect();
     const popoverRect = this.notePopover.getBoundingClientRect();
     
-    // Calculate position - try below first, then above if needed
-    let top = rect.bottom + window.scrollY + 8;
-    let left = rect.left + window.scrollX;
+    // Calculate position - try LEFT first, then BOTTOM-LEFT if needed
+    let top = rect.top + window.scrollY;
+    let left = rect.left + window.scrollX - popoverRect.width - 8;
     
-    // Check if popover would go below viewport
-    if (top + popoverRect.height > window.scrollY + window.innerHeight) {
-      // Try positioning above
-      top = rect.top + window.scrollY - popoverRect.height - 8;
+    // Check if popover would go off left edge
+    if (left < window.scrollX) {
+      // Try positioning at BOTTOM-LEFT
+      left = rect.left + window.scrollX;
+      top = rect.bottom + window.scrollY + 8;
+      
+      // Check if bottom-left would go below viewport
+      if (top + popoverRect.height > window.scrollY + window.innerHeight) {
+        // Fallback: position at TOP-LEFT
+        top = rect.top + window.scrollY - popoverRect.height - 8;
+      }
+    }
+    
+    // Ensure popover doesn't go off top edge
+    if (top < window.scrollY) {
+      top = window.scrollY + 10;
     }
     
     // Ensure popover doesn't go off right edge
     if (left + popoverRect.width > window.scrollX + window.innerWidth) {
       left = window.scrollX + window.innerWidth - popoverRect.width - 10;
-    }
-    
-    // Ensure popover doesn't go off left edge
-    if (left < window.scrollX) {
-      left = window.scrollX + 10;
     }
     
     this.notePopover.style.top = top + 'px';

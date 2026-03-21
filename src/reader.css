@@ -673,13 +673,15 @@ body.dark-theme .note-popover .note-btn-cancel:hover {
   background: #3367d6;
 }
 
-/* Note indicator (underline) for highlighted text with notes */
+/* Note indicator (underline) for text with notes - no background highlight */
 mark.citron-highlight.has-note {
-  border-bottom: 2px solid rgba(0, 0, 0, 0.4);
+  border-bottom: 2px solid #4285f4;
+  background-color: transparent !important;
 }
 
 body.dark-theme mark.citron-highlight.has-note {
-  border-bottom: 2px solid rgba(255, 255, 255, 0.6);
+  border-bottom: 2px solid #8ab4f8;
+  background-color: transparent !important;
 }
 
 /* Additional highlight colors */
