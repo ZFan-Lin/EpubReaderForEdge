@@ -1669,33 +1669,34 @@ class CitronReader {
       return this.findExactTextNode(elementNode, offset);
     }
     
-    let count = 0;
-    for (let child of elementNode.childNodes) {
-      if (child.nodeType === Node.TEXT_NODE) {
-        if (count === textNodeIndex) {
-          // Found the target text node
-          return {
-            textNode: child,
-            offset: Math.min(Math.max(0, offset), child.length)
-          };
-        }
-        count++;
-      }
-    }
+    // Use TreeWalker to traverse all text nodes in the element's subtree
+    // This handles nested structures like <p><span>text</span></p> correctly
+    const walker = document.createTreeWalker(
+      elementNode,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
     
-    // If not found among direct children, search in descendant elements
-    // This handles cases like <p><span>text</span></p> where the text node is inside a span
-    for (let child of elementNode.childNodes) {
-      if (child.nodeType === Node.ELEMENT_NODE) {
-        const result = this.findTextNodeByIndexInElement(child, textNodeIndex, offset);
-        if (result) return result;
+    let count = 0;
+    let node = walker.nextNode();
+    while (node) {
+      if (count === textNodeIndex) {
+        // Found the target text node
+        return {
+          textNode: node,
+          offset: Math.min(Math.max(0, offset), node.length)
+        };
       }
+      count++;
+      node = walker.nextNode();
     }
     
     return null;
   }
   
   // Helper to find text node by index within an element (recursive)
+  // Deprecated: kept for backward compatibility but no longer used
   findTextNodeByIndexInElement(elementNode, textNodeIndex, offset) {
     let count = 0;
     for (let child of elementNode.childNodes) {
