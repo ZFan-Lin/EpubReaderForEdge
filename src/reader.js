@@ -1515,56 +1515,40 @@ class CitronReader {
         // Both start and end nodes found - use path-based reconstruction
         let startTextNode = null;
         let endTextNode = null;
-        let startCharCount = 0;
-        let endCharCount = 0;
+        let actualStartOffset = highlight.startOffset;
+        let actualEndOffset = highlight.endOffset;
         
-        // Process start node
+        // Process start node: find the actual text node and adjust offset if needed
         if (startNode.nodeType === Node.TEXT_NODE) {
+          // Start node is already a text node, use it directly
           startTextNode = startNode;
-          startCharCount = 0;
-        } else if (startNode.childNodes.length > 0) {
-          const findTextNodeForStart = (node) => {
-            if (node.nodeType === Node.TEXT_NODE) {
-              if (startCharCount + node.length >= highlight.startOffset) {
-                startTextNode = node;
-                return true;
-              }
-              startCharCount += node.length;
-            }
-            for (let child of node.childNodes) {
-              if (findTextNodeForStart(child)) return true;
-            }
-            return false;
-          };
-          findTextNodeForStart(startNode);
+          actualStartOffset = Math.min(Math.max(0, highlight.startOffset), startNode.length);
+        } else {
+          // Start node is an element, need to find the text node within it
+          const result = this.findTextNodeAndOffset(startNode, highlight.startOffset);
+          if (result) {
+            startTextNode = result.textNode;
+            actualStartOffset = result.offset;
+          }
         }
         
-        // Process end node
+        // Process end node: find the actual text node and adjust offset if needed
         if (endNode.nodeType === Node.TEXT_NODE) {
+          // End node is already a text node, use it directly
           endTextNode = endNode;
-          endCharCount = 0;
-        } else if (endNode.childNodes.length > 0) {
-          const findTextNodeForEnd = (node) => {
-            if (node.nodeType === Node.TEXT_NODE) {
-              if (endCharCount + node.length >= highlight.endOffset) {
-                endTextNode = node;
-                return true;
-              }
-              endCharCount += node.length;
-            }
-            for (let child of node.childNodes) {
-              if (findTextNodeForEnd(child)) return true;
-            }
-            return false;
-          };
-          findTextNodeForEnd(endNode);
+          actualEndOffset = Math.min(Math.max(0, highlight.endOffset), endNode.length);
+        } else {
+          // End node is an element, need to find the text node within it
+          const result = this.findTextNodeAndOffset(endNode, highlight.endOffset);
+          if (result) {
+            endTextNode = result.textNode;
+            actualEndOffset = result.offset;
+          }
         }
         
         // If we found both text nodes, create the range
         if (startTextNode && endTextNode) {
           const range = doc.createRange();
-          const actualStartOffset = Math.min(Math.max(0, highlight.startOffset - startCharCount), startTextNode.length);
-          const actualEndOffset = Math.min(Math.max(0, highlight.endOffset - endCharCount), endTextNode.length);
           
           try {
             range.setStart(startTextNode, actualStartOffset);
@@ -1624,6 +1608,36 @@ class CitronReader {
     } catch (e) {
       console.warn('Could not apply existing highlight:', e);
     }
+  }
+  
+  // Find text node and offset within an element node
+  // Returns { textNode, offset } or null if not found
+  findTextNodeAndOffset(elementNode, targetOffset) {
+    let charCount = 0;
+    
+    const findInChildren = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (charCount + node.length > targetOffset) {
+          // Found the text node containing the target offset
+          return {
+            textNode: node,
+            offset: targetOffset - charCount
+          };
+        }
+        charCount += node.length;
+        return null;
+      }
+      
+      // Recursively search in child nodes
+      for (let child of node.childNodes) {
+        const result = findInChildren(child);
+        if (result) return result;
+      }
+      
+      return null;
+    };
+    
+    return findInChildren(elementNode);
   }
 
   applyFontSize() {
