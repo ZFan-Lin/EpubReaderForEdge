@@ -1509,37 +1509,49 @@ class CitronReader {
       // Try to find the text node using the stored path and offset
       const startNode = this.findNodeFromPath(highlight.parentPath, doc);
       
-      if (startNode && startNode.childNodes.length > 0) {
-        // Find the text node
+      if (startNode) {
         let textNode = null;
         let charCount = 0;
         
-        const findTextNode = (node) => {
-          if (node.nodeType === Node.TEXT_NODE) {
-            if (charCount + node.length >= highlight.startOffset) {
-              textNode = node;
-              return true;
+        // If startNode is already a text node, use it directly
+        if (startNode.nodeType === Node.TEXT_NODE) {
+          textNode = startNode;
+          charCount = 0;
+        } else if (startNode.childNodes.length > 0) {
+          // Find the text node within the parent node
+          const findTextNode = (node) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+              if (charCount + node.length >= highlight.startOffset) {
+                textNode = node;
+                return true;
+              }
+              charCount += node.length;
             }
-            charCount += node.length;
-          }
-          for (let child of node.childNodes) {
-            if (findTextNode(child)) return true;
-          }
-          return false;
-        };
+            for (let child of node.childNodes) {
+              if (findTextNode(child)) return true;
+            }
+            return false;
+          };
+          
+          findTextNode(startNode);
+        }
         
-        findTextNode(startNode);
-        
-        if (textNode) {
+        if (textNode && textNode.length >= charCount) {
           const range = doc.createRange();
-          range.setStart(textNode, highlight.startOffset - charCount);
-          range.setEnd(textNode, highlight.startOffset - charCount + (highlight.endOffset - highlight.startOffset));
-          this.addHighlightToDOM(range, highlight.id, highlight.color || 'yellow');
+          const actualStartOffset = Math.min(highlight.startOffset - charCount, textNode.length);
+          const highlightLength = highlight.endOffset - highlight.startOffset;
+          const actualEndOffset = Math.min(actualStartOffset + highlightLength, textNode.length);
+          
+          if (actualStartOffset < actualEndOffset) {
+            range.setStart(textNode, actualStartOffset);
+            range.setEnd(textNode, actualEndOffset);
+            this.addHighlightToDOM(range, highlight.id, highlight.color || 'yellow');
+          }
         }
       }
       
-      // Fallback: search by text content
-      if (!startNode) {
+      // Fallback: search by text content if node path method failed
+      if (!startNode || !textNode) {
         const bodyText = doc.body.textContent;
         const searchText = highlight.text;
         const index = bodyText.indexOf(searchText);
