@@ -1559,12 +1559,9 @@ class CitronReader {
           startTextNode = startNode;
           actualStartOffset = Math.min(Math.max(0, highlight.startOffset), startNode.length);
         } else {
-          // Start node is an element - the stored offset is relative to the original startContainer
-          // which was a direct child of this element. We need to find that specific child text node.
-          // For cross-paragraph selections, the startContainer/endContainer are typically text nodes
-          // inside elements like <span> within <p> elements.
-          // Since we now store text nodes directly in the path, this case should be rare
-          const result = this.findExactTextNode(startNode, highlight.startOffset);
+          // Start node is an element - use textNodeIndex from the last step of the path
+          const lastStep = highlight.startParentPath[highlight.startParentPath.length - 1];
+          const result = this.findTextNodeByIndex(startNode, lastStep.textNodeIndex, highlight.startOffset);
           if (result) {
             startTextNode = result.textNode;
             actualStartOffset = result.offset;
@@ -1577,8 +1574,9 @@ class CitronReader {
           endTextNode = endNode;
           actualEndOffset = Math.min(Math.max(0, highlight.endOffset), endNode.length);
         } else {
-          // End node is an element - similar logic as start node
-          const result = this.findExactTextNode(endNode, highlight.endOffset);
+          // End node is an element - use textNodeIndex from the last step of the path
+          const lastStep = highlight.endParentPath[highlight.endParentPath.length - 1];
+          const result = this.findTextNodeByIndex(endNode, lastStep.textNodeIndex, highlight.endOffset);
           if (result) {
             endTextNode = result.textNode;
             actualEndOffset = result.offset;
@@ -1647,6 +1645,60 @@ class CitronReader {
     } catch (e) {
       console.warn('Could not apply existing highlight:', e);
     }
+  }
+  
+  // Find text node by its index among siblings and the offset within it
+  // This uses the textNodeIndex stored in the path to locate the exact text node
+  findTextNodeByIndex(elementNode, textNodeIndex, offset) {
+    if (textNodeIndex < 0) {
+      // Fallback if textNodeIndex is not available
+      return this.findExactTextNode(elementNode, offset);
+    }
+    
+    let count = 0;
+    for (let child of elementNode.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        if (count === textNodeIndex) {
+          // Found the target text node
+          return {
+            textNode: child,
+            offset: Math.min(Math.max(0, offset), child.length)
+          };
+        }
+        count++;
+      }
+    }
+    
+    // If not found among direct children, search in descendant elements
+    // This handles cases like <p><span>text</span></p> where the text node is inside a span
+    for (let child of elementNode.childNodes) {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const result = this.findTextNodeByIndexInElement(child, textNodeIndex, offset);
+        if (result) return result;
+      }
+    }
+    
+    return null;
+  }
+  
+  // Helper to find text node by index within an element (recursive)
+  findTextNodeByIndexInElement(elementNode, textNodeIndex, offset) {
+    let count = 0;
+    for (let child of elementNode.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        if (count === textNodeIndex) {
+          return {
+            textNode: child,
+            offset: Math.min(Math.max(0, offset), child.length)
+          };
+        }
+        count++;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const result = this.findTextNodeByIndexInElement(child, textNodeIndex, offset);
+        if (result) return result;
+      }
+    }
+    return null;
   }
   
   // Find the exact text node that was originally selected
