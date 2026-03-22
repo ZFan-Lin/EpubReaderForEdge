@@ -1181,16 +1181,26 @@ class CitronReader {
         }
       }
       
-      // If this is a text node, also store its position among text nodes in the parent
+      // If this is a text node, calculate its global index among ALL text nodes in the parent element's subtree
+      // This ensures consistency with findTextNodeByGlobalIndex which uses TreeWalker
       let textNodeIndex = -1;
       if (current.nodeType === Node.TEXT_NODE) {
         textNodeIndex = 0;
-        let prevSibling = current.previousSibling;
-        while (prevSibling) {
-          if (prevSibling.nodeType === Node.TEXT_NODE) {
+        const parent = current.parentElement;
+        if (parent) {
+          // Use TreeWalker to count all text nodes before this one in the parent's subtree
+          const walker = document.createTreeWalker(
+            parent,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+          );
+          
+          let node = walker.nextNode();
+          while (node && node !== current) {
             textNodeIndex++;
+            node = walker.nextNode();
           }
-          prevSibling = prevSibling.previousSibling;
         }
       }
       
@@ -1212,14 +1222,8 @@ class CitronReader {
     if (!path || path.length === 0) return null;
     
     let current = doc.body;
-    for (let i = 0; i < path.length; i++) {
+    for (let i = 0; i < path.length - 1; i++) {
       const step = path[i];
-      
-      // If this step is looking for a text node, we need special handling
-      if (step.isTextNode) {
-        // Use TreeWalker to find the text node by its global index among all descendant text nodes
-        return this.findTextNodeByGlobalIndex(current, step.textNodeIndex);
-      }
       
       // For element nodes, use the original logic
       const children = Array.from(current.childNodes).filter(n => 
@@ -1233,7 +1237,23 @@ class CitronReader {
       }
     }
     
-    return current;
+    // Handle the last step which might be a text node
+    const lastStep = path[path.length - 1];
+    if (lastStep.isTextNode) {
+      // Use TreeWalker to find the text node by its global index among all descendant text nodes
+      return this.findTextNodeByGlobalIndex(current, lastStep.textNodeIndex);
+    }
+    
+    // If last step is an element node, find it normally
+    const children = Array.from(current.childNodes).filter(n => 
+      n.nodeName === lastStep.name && (lastStep.id === null || n.id === lastStep.id)
+    );
+    
+    if (children.length > lastStep.index) {
+      return children[lastStep.index];
+    }
+    
+    return null;
   }
 
   // Find text node by its global index among all descendant text nodes
@@ -1575,10 +1595,10 @@ class CitronReader {
         } else {
           // Start node is an element - use textNodeIndex from the last step of the path
           const lastStep = highlight.startParentPath[highlight.startParentPath.length - 1];
-          const result = this.findTextNodeByIndex(startNode, lastStep.textNodeIndex, highlight.startOffset);
+          const result = this.findTextNodeByGlobalIndex(startNode, lastStep.textNodeIndex);
           if (result) {
-            startTextNode = result.textNode;
-            actualStartOffset = result.offset;
+            startTextNode = result;
+            actualStartOffset = Math.min(Math.max(0, highlight.startOffset), result.length);
           }
         }
         
@@ -1590,10 +1610,10 @@ class CitronReader {
         } else {
           // End node is an element - use textNodeIndex from the last step of the path
           const lastStep = highlight.endParentPath[highlight.endParentPath.length - 1];
-          const result = this.findTextNodeByIndex(endNode, lastStep.textNodeIndex, highlight.endOffset);
+          const result = this.findTextNodeByGlobalIndex(endNode, lastStep.textNodeIndex);
           if (result) {
-            endTextNode = result.textNode;
-            actualEndOffset = result.offset;
+            endTextNode = result;
+            actualEndOffset = Math.min(Math.max(0, highlight.endOffset), result.length);
           }
         }
         
