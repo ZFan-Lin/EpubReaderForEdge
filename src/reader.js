@@ -1217,19 +1217,8 @@ class CitronReader {
       
       // If this step is looking for a text node, we need special handling
       if (step.isTextNode) {
-        // Find the parent element first (should be the previous step or current)
-        // The text node should be a direct child of 'current'
-        let textNodeCount = 0;
-        for (let child of current.childNodes) {
-          if (child.nodeType === Node.TEXT_NODE) {
-            if (textNodeCount === step.textNodeIndex) {
-              return child;
-            }
-            textNodeCount++;
-          }
-        }
-        // If we couldn't find the exact text node, return null
-        return null;
+        // Use TreeWalker to find the text node by its global index among all descendant text nodes
+        return this.findTextNodeByGlobalIndex(current, step.textNodeIndex);
       }
       
       // For element nodes, use the original logic
@@ -1245,6 +1234,31 @@ class CitronReader {
     }
     
     return current;
+  }
+
+  // Find text node by its global index among all descendant text nodes
+  // Uses TreeWalker to traverse all text nodes in the element's subtree
+  findTextNodeByGlobalIndex(element, targetIndex) {
+    if (targetIndex < 0) return null;
+    
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+    
+    let count = 0;
+    let node = walker.nextNode();
+    while (node) {
+      if (count === targetIndex) {
+        return node;
+      }
+      count++;
+      node = walker.nextNode();
+    }
+    
+    return null;
   }
 
   // Add highlight mark element to DOM
