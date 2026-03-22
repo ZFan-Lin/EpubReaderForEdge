@@ -1062,7 +1062,11 @@ class CitronReader {
     const chapterIndex = this.currentChapterIndex;
     const chapterHref = this.chapters[chapterIndex]?.href || '';
     
-    // Create highlight object with color
+    // Calculate global offsets from the beginning of the chapter body
+    const startGlobalOffset = this.calculateGlobalOffset(originalRange.startContainer, originalRange.startOffset, doc);
+    const endGlobalOffset = this.calculateGlobalOffset(originalRange.endContainer, originalRange.endOffset, doc);
+    
+    // Create highlight object with color - using global offsets instead of relative offsets
     const highlight = {
       id: 'hl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
       text: selectedText,
@@ -1070,8 +1074,8 @@ class CitronReader {
       chapterIndex: chapterIndex,
       chapterHref: chapterHref,
       timestamp: Date.now(),
-      startOffset: originalRange.startOffset,
-      endOffset: originalRange.endOffset,
+      startGlobalOffset: startGlobalOffset,
+      endGlobalOffset: endGlobalOffset,
       startParentPath: this.getNodePath(originalRange.startContainer),
       endParentPath: this.getNodePath(originalRange.endContainer)
     };
@@ -1276,6 +1280,72 @@ class CitronReader {
       }
       count++;
       node = walker.nextNode();
+    }
+    
+    return null;
+  }
+
+  // Calculate global text offset from body start to a given node and offset
+  // Returns the cumulative character count from the beginning of body to the specified position
+  calculateGlobalOffset(node, offset, doc) {
+    let globalOffset = 0;
+    
+    // Use TreeWalker to traverse all text nodes in body
+    const walker = doc.createTreeWalker(
+      doc.body,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+    
+    let currentNode = walker.nextNode();
+    while (currentNode) {
+      if (currentNode === node) {
+        // Found our target node, add the offset within it
+        globalOffset += offset;
+        break;
+      }
+      // Add the full length of this text node
+      globalOffset += currentNode.length || 0;
+      currentNode = walker.nextNode();
+    }
+    
+    return globalOffset;
+  }
+
+  // Find a position (node + offset) from a global offset
+  // Returns { node, offset } or null if not found
+  findPositionFromGlobalOffset(globalOffset, doc) {
+    let currentOffset = 0;
+    
+    // Use TreeWalker to traverse all text nodes in body
+    const walker = doc.createTreeWalker(
+      doc.body,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+    
+    let node = walker.nextNode();
+    while (node) {
+      const nodeLength = node.length || 0;
+      
+      if (currentOffset + nodeLength >= globalOffset) {
+        // The target position is within this node
+        return {
+          node: node,
+          offset: Math.min(globalOffset - currentOffset, nodeLength)
+        };
+      }
+      
+      currentOffset += nodeLength;
+      node = walker.nextNode();
+    }
+    
+    // If we reach here, the offset might be beyond the text content
+    // Return the last node if available
+    if (node) {
+      return { node: node, offset: node.length };
     }
     
     return null;
@@ -1576,7 +1646,27 @@ class CitronReader {
   // Apply an existing highlight to the DOM
   applyExistingHighlight(doc, highlight) {
     try {
-      // Try to find the start and end text nodes using the stored paths and offsets
+      // Check if this highlight uses global offsets (new format) or relative offsets (old format)
+      const hasGlobalOffsets = highlight.startGlobalOffset !== undefined && highlight.endGlobalOffset !== undefined;
+      
+      if (hasGlobalOffsets) {
+        // New approach: use global offsets to find positions
+        const startPos = this.findPositionFromGlobalOffset(highlight.startGlobalOffset, doc);
+        const endPos = this.findPositionFromGlobalOffset(highlight.endGlobalOffset, doc);
+        
+        if (startPos && endPos) {
+          const range = doc.createRange();
+          range.setStart(startPos.node, startPos.offset);
+          range.setEnd(endPos.node, endPos.offset);
+          
+          if (!range.collapsed) {
+            this.addHighlightToDOM(range, highlight.id, highlight.color || 'yellow');
+            return;
+          }
+        }
+      }
+      
+      // Legacy approach: try to find the start and end text nodes using stored paths and offsets
       const startNode = this.findNodeFromPath(highlight.startParentPath, doc);
       const endNode = this.findNodeFromPath(highlight.endParentPath, doc);
       
@@ -1591,14 +1681,16 @@ class CitronReader {
         if (startNode.nodeType === Node.TEXT_NODE) {
           // Start node is already a text node, use it directly
           startTextNode = startNode;
-          actualStartOffset = Math.min(Math.max(0, highlight.startOffset), startNode.length);
+          // Use legacy relative offset for backward compatibility
+          actualStartOffset = Math.min(Math.max(0, highlight.startOffset || 0), startNode.length);
         } else {
           // Start node is an element - use textNodeIndex from the last step of the path
           const lastStep = highlight.startParentPath[highlight.startParentPath.length - 1];
           const result = this.findTextNodeByGlobalIndex(startNode, lastStep.textNodeIndex);
           if (result) {
             startTextNode = result;
-            actualStartOffset = Math.min(Math.max(0, highlight.startOffset), result.length);
+            // Use legacy relative offset for backward compatibility
+            actualStartOffset = Math.min(Math.max(0, highlight.startOffset || 0), result.length);
           }
         }
         
@@ -1606,14 +1698,16 @@ class CitronReader {
         if (endNode.nodeType === Node.TEXT_NODE) {
           // End node is already a text node, use it directly
           endTextNode = endNode;
-          actualEndOffset = Math.min(Math.max(0, highlight.endOffset), endNode.length);
+          // Use legacy relative offset for backward compatibility
+          actualEndOffset = Math.min(Math.max(0, highlight.endOffset || 0), endNode.length);
         } else {
           // End node is an element - use textNodeIndex from the last step of the path
           const lastStep = highlight.endParentPath[highlight.endParentPath.length - 1];
           const result = this.findTextNodeByGlobalIndex(endNode, lastStep.textNodeIndex);
           if (result) {
             endTextNode = result;
-            actualEndOffset = Math.min(Math.max(0, highlight.endOffset), result.length);
+            // Use legacy relative offset for backward compatibility
+            actualEndOffset = Math.min(Math.max(0, highlight.endOffset || 0), result.length);
           }
         }
         
@@ -2089,7 +2183,12 @@ class CitronReader {
       const chapterIndex = this.currentChapterIndex;
       const chapterHref = this.chapters[chapterIndex]?.href || '';
       
+      // Calculate global offsets from the beginning of the chapter body
+      const startGlobalOffset = this.calculateGlobalOffset(range.startContainer, range.startOffset, doc);
+      const endGlobalOffset = this.calculateGlobalOffset(range.endContainer, range.endOffset, doc);
+      
       // Create highlight object - color is 'note' to indicate underline-only style
+      // Using global offsets instead of relative offsets for reliable restoration
       const highlight = {
         id: 'hl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
         text: selectedText,
@@ -2097,8 +2196,8 @@ class CitronReader {
         chapterIndex: chapterIndex,
         chapterHref: chapterHref,
         timestamp: Date.now(),
-        startOffset: range.startOffset,
-        endOffset: range.endOffset,
+        startGlobalOffset: startGlobalOffset,
+        endGlobalOffset: endGlobalOffset,
         startParentPath: this.getNodePath(range.startContainer),
         endParentPath: this.getNodePath(range.endContainer)
       };
