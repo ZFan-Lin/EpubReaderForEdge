@@ -2079,9 +2079,18 @@ class CitronReader {
       const frame = document.getElementById('viewerFrame');
       if (!frame || !frame.contentDocument) return;
       
-      // Apply indicators to highlights that have notes
+      // Get highlights for current chapter to filter notes
+      const highlights = JSON.parse(localStorage.getItem(this.HIGHLIGHTS_KEY) || '{}');
+      const bookHighlights = highlights[this.currentBookKey] || [];
+      const currentChapterHighlightIds = bookHighlights
+        .filter(h => h.chapterIndex === this.currentChapterIndex)
+        .map(h => h.id);
+      
+      // Apply indicators only to highlights in current chapter that have notes
       for (const highlightId of Object.keys(bookNotes)) {
-        this.addNoteIndicatorToHighlight(highlightId);
+        if (currentChapterHighlightIds.includes(highlightId)) {
+          this.addNoteIndicatorToHighlight(highlightId);
+        }
       }
     } catch (e) {
       console.warn('Could not load note indicators:', e);
