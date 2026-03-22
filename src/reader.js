@@ -1526,9 +1526,9 @@ class CitronReader {
         } else {
           // Start node is an element - the stored offset is relative to the original startContainer
           // which was a direct child of this element. We need to find that specific child text node.
-          // The key insight: when saving, startContainer was the direct node where selection started
-          // For cross-paragraph selections within a chapter, this is typically a text node child of a <p> element
-          const result = this.findDirectChildTextNode(startNode, highlight.startOffset);
+          // For cross-paragraph selections, the startContainer/endContainer are typically text nodes
+          // inside elements like <span> within <p> elements.
+          const result = this.findExactTextNode(startNode, highlight.startOffset);
           if (result) {
             startTextNode = result.textNode;
             actualStartOffset = result.offset;
@@ -1542,7 +1542,7 @@ class CitronReader {
           actualEndOffset = Math.min(Math.max(0, highlight.endOffset), endNode.length);
         } else {
           // End node is an element - similar logic as start node
-          const result = this.findDirectChildTextNode(endNode, highlight.endOffset);
+          const result = this.findExactTextNode(endNode, highlight.endOffset);
           if (result) {
             endTextNode = result.textNode;
             actualEndOffset = result.offset;
@@ -1613,15 +1613,13 @@ class CitronReader {
     }
   }
   
-  // Find a direct child text node of an element that could contain the given offset
-  // This handles the case where the saved offset is relative to a direct child text node
+  // Find the exact text node that was originally selected
+  // This handles nested structures like <p><span>text</span></p>
   // Returns { textNode, offset } or null if not found
-  findDirectChildTextNode(elementNode, targetOffset) {
-    // Strategy: Look for a direct child text node whose length is >= targetOffset
-    // This works because when saving, the offset was relative to that specific text node
+  findExactTextNode(elementNode, targetOffset) {
+    // First, try to find a direct child text node
     for (let child of elementNode.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
-        // If the target offset is within this text node's length, this is likely our target
         if (targetOffset <= child.length) {
           return {
             textNode: child,
@@ -1629,8 +1627,23 @@ class CitronReader {
           };
         }
       } else if (child.nodeType === Node.ELEMENT_NODE) {
+        // If the element has only one text node descendant, check it
+        const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT, null, false);
+        const firstTextNode = walker.nextNode();
+        const secondTextNode = walker.nextNode();
+        
+        // If this element contains exactly one text node and no other elements with text
+        if (firstTextNode && !secondTextNode) {
+          if (targetOffset <= firstTextNode.length) {
+            return {
+              textNode: firstTextNode,
+              offset: Math.min(targetOffset, firstTextNode.length)
+            };
+          }
+        }
+        
         // Recursively search in child elements
-        const result = this.findDirectChildTextNode(child, targetOffset);
+        const result = this.findExactTextNode(child, targetOffset);
         if (result) return result;
       }
     }
