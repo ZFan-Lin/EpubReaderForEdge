@@ -836,11 +836,13 @@ class CitronReader {
             background-color: #f57c00 !important;
           }
           mark.citron-highlight.has-note {
-            border-bottom: 2px solid #4285f4;
+            border-bottom: 1px solid #4285f4;
+            padding-bottom: 0px;
             background-color: transparent !important;
           }
           body.dark-theme mark.citron-highlight.has-note {
-            border-bottom: 2px solid #8ab4f8;
+            border-bottom: 1px solid #8ab4f8;
+            padding-bottom: 0px;
             background-color: transparent !important;
           }
         `;
@@ -1223,8 +1225,16 @@ class CitronReader {
       const endContainer = range.endContainer;
       
       // Determine the class name based on color
-      // If color is null/empty, don't add a color class (for note-only highlights)
-      const colorClass = color ? color : '';
+      // If color is 'note', use has-note class for underline-only style
+      // If color is null/empty, don't add a color class
+      let colorClass = '';
+      let hasNoteClass = false;
+      
+      if (color === 'note') {
+        hasNoteClass = true;
+      } else if (color) {
+        colorClass = color;
+      }
       
       // Case 1: Single text node selection - simplest and most common case
       if (startContainer === endContainer && startContainer.nodeType === Node.TEXT_NODE) {
@@ -1249,7 +1259,9 @@ class CitronReader {
         
         const mark = document.createElement('mark');
         mark.classList.add('citron-highlight');
-        if (colorClass) {
+        if (hasNoteClass) {
+          mark.classList.add('has-note');
+        } else if (colorClass) {
           mark.classList.add(colorClass);
         }
         mark.dataset.highlightId = highlightId;
@@ -1346,7 +1358,9 @@ class CitronReader {
         
         const mark = document.createElement('mark');
         mark.classList.add('citron-highlight');
-        if (colorClass) {
+        if (hasNoteClass) {
+          mark.classList.add('has-note');
+        } else if (colorClass) {
           mark.classList.add(colorClass);
         }
         mark.dataset.highlightId = highlightId;
@@ -1817,16 +1831,16 @@ class CitronReader {
       // Selection is within an existing highlight, show/edit note for it
       this.showNotePopover(highlightEl.dataset.highlightId, highlightEl);
     } else {
-      // Selection is not highlighted yet, create a default highlight with NO background color
+      // Selection is not highlighted yet, create a note-only highlight (underline only, no background)
       const selectedText = selection.toString().trim();
       const chapterIndex = this.currentChapterIndex;
       const chapterHref = this.chapters[chapterIndex]?.href || '';
       
-      // Create highlight object - no color means underline only
+      // Create highlight object - color is 'note' to indicate underline-only style
       const highlight = {
         id: 'hl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
         text: selectedText,
-        color: null, // null color means no background, just underline for notes
+        color: 'note', // 'note' color means underline only, no background
         chapterIndex: chapterIndex,
         chapterHref: chapterHref,
         timestamp: Date.now(),
@@ -1838,8 +1852,8 @@ class CitronReader {
       // Save highlight first
       this.saveHighlight(highlight);
       
-      // Apply visual highlight with no background (just creates the mark element)
-      const success = this.addHighlightToDOM(range, highlight.id, null);
+      // Apply visual highlight with 'note' style (underline only)
+      const success = this.addHighlightToDOM(range, highlight.id, 'note');
       
       if (success) {
         // Clear selection
