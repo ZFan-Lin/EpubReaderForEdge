@@ -1515,31 +1515,34 @@ class CitronReader {
         // Both start and end nodes found - use path-based reconstruction
         let startTextNode = null;
         let endTextNode = null;
-        let actualStartOffset = highlight.startOffset;
-        let actualEndOffset = highlight.endOffset;
+        let actualStartOffset = 0;
+        let actualEndOffset = 0;
         
-        // Process start node: find the actual text node and adjust offset if needed
+        // Process start node: find the actual text node and offset
         if (startNode.nodeType === Node.TEXT_NODE) {
           // Start node is already a text node, use it directly
           startTextNode = startNode;
           actualStartOffset = Math.min(Math.max(0, highlight.startOffset), startNode.length);
         } else {
-          // Start node is an element, need to find the text node within it
-          const result = this.findTextNodeAndOffset(startNode, highlight.startOffset);
+          // Start node is an element - the stored offset is relative to the original startContainer
+          // which was a direct child of this element. We need to find that specific child text node.
+          // The key insight: when saving, startContainer was the direct node where selection started
+          // For cross-paragraph selections within a chapter, this is typically a text node child of a <p> element
+          const result = this.findDirectChildTextNode(startNode, highlight.startOffset);
           if (result) {
             startTextNode = result.textNode;
             actualStartOffset = result.offset;
           }
         }
         
-        // Process end node: find the actual text node and adjust offset if needed
+        // Process end node: find the actual text node and offset
         if (endNode.nodeType === Node.TEXT_NODE) {
           // End node is already a text node, use it directly
           endTextNode = endNode;
           actualEndOffset = Math.min(Math.max(0, highlight.endOffset), endNode.length);
         } else {
-          // End node is an element, need to find the text node within it
-          const result = this.findTextNodeAndOffset(endNode, highlight.endOffset);
+          // End node is an element - similar logic as start node
+          const result = this.findDirectChildTextNode(endNode, highlight.endOffset);
           if (result) {
             endTextNode = result.textNode;
             actualEndOffset = result.offset;
@@ -1608,6 +1611,41 @@ class CitronReader {
     } catch (e) {
       console.warn('Could not apply existing highlight:', e);
     }
+  }
+  
+  // Find a direct child text node of an element that could contain the given offset
+  // This handles the case where the saved offset is relative to a direct child text node
+  // Returns { textNode, offset } or null if not found
+  findDirectChildTextNode(elementNode, targetOffset) {
+    // Strategy: Look for a direct child text node whose length is >= targetOffset
+    // This works because when saving, the offset was relative to that specific text node
+    for (let child of elementNode.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        // If the target offset is within this text node's length, this is likely our target
+        if (targetOffset <= child.length) {
+          return {
+            textNode: child,
+            offset: Math.min(targetOffset, child.length)
+          };
+        }
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        // Recursively search in child elements
+        const result = this.findDirectChildTextNode(child, targetOffset);
+        if (result) return result;
+      }
+    }
+    
+    // Fallback: return the first text node found with the offset clamped to its length
+    const walker = document.createTreeWalker(elementNode, NodeFilter.SHOW_TEXT, null, false);
+    const firstTextNode = walker.nextNode();
+    if (firstTextNode) {
+      return {
+        textNode: firstTextNode,
+        offset: Math.min(Math.max(0, targetOffset), firstTextNode.length)
+      };
+    }
+    
+    return null;
   }
   
   // Find text node and offset within an element node
